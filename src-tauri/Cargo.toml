@@ -1,0 +1,40 @@
+[package]
+name = "aizavr"
+version = "0.1.0"
+description = "AiZavr — branching LLM chat client with context compression"
+authors = ["MrLUG67"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "aizavr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for LLM API calls
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# SQLite — async, compile-time checked queries
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros"] }
+
+# System keychain for API keys storage
+keyring = "3"
+
+# UUID generation for tree nodes
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Tokenizer for context window indicator
+tiktoken-rs = "0.6"
