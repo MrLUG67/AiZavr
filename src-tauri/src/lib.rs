@@ -8,8 +8,6 @@ mod keychain;
 use db::{DbDialog, DbNode};
 use llm::{Message, openrouter::OpenRouterProvider, LlmProvider};
 
-// Обёртка для хранения пула в Tauri State.
-// Mutex нужен, потому что State требует Send + Sync.
 struct AppState {
     db: sqlx::SqlitePool,
 }
@@ -22,8 +20,10 @@ struct AppState {
 async fn send_message(
     messages: Vec<Message>,
     model_id: String,
-    api_key: String,
 ) -> Result<String, String> {
+    let api_key = keychain::get_api_key("openrouter")?
+        .ok_or_else(|| "OpenRouter API key not set. Use Settings to add it.".to_string())?;
+
     let provider = OpenRouterProvider::new(api_key);
     let response = provider.send(messages, &model_id).await?;
     Ok(response.content)
@@ -138,6 +138,25 @@ async fn cmd_set_active_child(
 }
 
 // ---------------------------------------------------------------------------
+// Keychain
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn cmd_set_api_key(provider_id: String, api_key: String) -> Result<(), String> {
+    keychain::set_api_key(&provider_id, &api_key)
+}
+
+#[tauri::command]
+fn cmd_get_api_key(provider_id: String) -> Result<Option<String>, String> {
+    keychain::get_api_key(&provider_id)
+}
+
+#[tauri::command]
+fn cmd_delete_api_key(provider_id: String) -> Result<(), String> {
+    keychain::delete_api_key(&provider_id)
+}
+
+// ---------------------------------------------------------------------------
 // Точка входа
 // ---------------------------------------------------------------------------
 
@@ -153,8 +172,6 @@ pub fn run() {
                 .to_string_lossy()
                 .to_string();
 
-            // Инициализируем БД синхронно в setup, чтобы State был готов
-            // до первого вызова команды.
             let pool = tauri::async_runtime::block_on(async {
                 db::init_db(&app_data_dir)
                     .await
@@ -174,6 +191,9 @@ pub fn run() {
             cmd_get_branch,
             cmd_get_children,
             cmd_set_active_child,
+            cmd_set_api_key,
+            cmd_get_api_key,
+            cmd_delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");

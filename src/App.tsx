@@ -7,7 +7,6 @@ interface Message {
   content: string;
 }
 
-// Соответствует DbDialog из Rust
 interface DbDialog {
   id: string;
   title: string;
@@ -15,7 +14,6 @@ interface DbDialog {
   active_leaf_id: string | null;
 }
 
-// Соответствует DbNode из Rust
 interface DbNode {
   id: string;
   parent_id: string | null;
@@ -29,51 +27,87 @@ function App() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [dialogId, setDialogId] = useState<string | null>(null);
-  // id последнего узла — parent для следующего
   const [lastNodeId, setLastNodeId] = useState<string | null>(null);
 
-  const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY ?? "";
+  // null — ещё не знаем, false — нет ключа, true — ключ есть
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyError, setKeyError] = useState("");
+
   const MODEL = "anthropic/claude-haiku-4-5";
 
-  // При старте: загружаем последний диалог или создаём новый
+  // При старте: проверяем ключ, потом инициализируем диалог
   useEffect(() => {
-    async function initDialog() {
-      const dialogs = await invoke<DbDialog[]>("cmd_list_dialogs");
+    async function init() {
+      const key = await invoke<string | null>("cmd_get_api_key", {
+        providerId: "openrouter",
+      });
 
-      if (dialogs.length > 0) {
-        const d = dialogs[0]; // последний по updated_at
-        setDialogId(d.id);
-
-        // Загружаем ветку из БД и восстанавливаем messages
-        const branch = await invoke<DbNode[]>("cmd_get_branch", {
-          dialogId: d.id,
-        });
-
-        const restored: Message[] = branch
-          .filter((n) => n.node_type === "user_message" || n.node_type === "assistant_message")
-          .map((n) => ({
-            role: n.node_type === "user_message" ? "user" : "assistant",
-            content: n.content,
-          }));
-
-        setMessages(restored);
-
-        // Запоминаем id последнего узла как точку продолжения
-        if (branch.length > 0) {
-          setLastNodeId(branch[branch.length - 1].id);
-        }
-      } else {
-        // Первый запуск — создаём диалог
-        const d = await invoke<DbDialog>("cmd_create_dialog", {
-          title: "New conversation",
-          notebookId: null,
-        });
-        setDialogId(d.id);
+      if (!key) {
+        setHasApiKey(false);
+        return;
       }
+
+      setHasApiKey(true);
+      await initDialog();
     }
 
-    initDialog().catch(console.error);
+    init().catch(console.error);
   }, []);
+
+  async function initDialog() {
+    const dialogs = await invoke<DbDialog[]>("cmd_list_dialogs");
+
+    if (dialogs.length > 0) {
+      const d = dialogs[0];
+      setDialogId(d.id);
+
+      const branch = await invoke<DbNode[]>("cmd_get_branch", {
+        dialogId: d.id,
+      });
+
+      const restored: Message[] = branch
+        .filter((n) => n.node_type === "user_message" || n.node_type === "assistant_message")
+        .map((n) => ({
+          role: n.node_type === "user_message" ? "user" : "assistant",
+          content: n.content,
+        }));
+
+      setMessages(restored);
+
+      if (branch.length > 0) {
+        setLastNodeId(branch[branch.length - 1].id);
+      }
+    } else {
+      const d = await invoke<DbDialog>("cmd_create_dialog", {
+        title: "New conversation",
+        notebookId: null,
+      });
+      setDialogId(d.id);
+    }
+  }
+
+  async function saveApiKey() {
+    setKeyError("");
+    const trimmed = keyInput.trim();
+
+    if (!trimmed) {
+      setKeyError("Key cannot be empty.");
+      return;
+    }
+
+    try {
+      await invoke("cmd_set_api_key", {
+        providerId: "openrouter",
+        apiKey: trimmed,
+      });
+      setHasApiKey(true);
+      setKeyInput("");
+      await initDialog();
+    } catch (e) {
+      setKeyError(`Failed to save key: ${e}`);
+    }
+  }
 
   async function sendMessage() {
     if (!input.trim() || loading || !dialogId) return;
@@ -82,7 +116,6 @@ function App() {
     setInput("");
     setLoading(true);
 
-    // 1. Сохраняем узел пользователя в БД
     const userNode = await invoke<DbNode>("cmd_create_node", {
       dialogId,
       parentId: lastNodeId,
@@ -97,7 +130,6 @@ function App() {
     setMessages(updatedMessages);
 
     try {
-      // 2. Отправляем в LLM
       const llmMessages = updatedMessages.map((m) => ({
         role: m.role,
         content: m.content,
@@ -106,10 +138,8 @@ function App() {
       const response = await invoke<string>("send_message", {
         messages: llmMessages,
         modelId: MODEL,
-        apiKey: API_KEY,
       });
 
-      // 3. Сохраняем ответ модели в БД
       const assistantNode = await invoke<DbNode>("cmd_create_node", {
         dialogId,
         parentId: userNode.id,
@@ -123,7 +153,6 @@ function App() {
       setMessages([...updatedMessages, { role: "assistant", content: response }]);
       setLastNodeId(assistantNode.id);
     } catch (e) {
-      // Ошибка — откатываем UI, узел пользователя уже в БД, это нормально
       setMessages([...updatedMessages, { role: "assistant", content: `Error: ${e}` }]);
       setLastNodeId(userNode.id);
     } finally {
@@ -131,6 +160,35 @@ function App() {
     }
   }
 
+  // Экран загрузки
+  if (hasApiKey === null) {
+    return <main className="container"><p>Loading...</p></main>;
+  }
+
+  // Экран ввода ключа
+  if (hasApiKey === false) {
+    return (
+      <main className="container">
+        <h1>AiZavr</h1>
+        <div className="setup">
+          <p>Enter your <a href="https://openrouter.ai/keys" target="_blank">OpenRouter API key</a> to get started.</p>
+          <div className="input-row">
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveApiKey()}
+              placeholder="sk-or-..."
+            />
+            <button onClick={saveApiKey}>Save</button>
+          </div>
+          {keyError && <p className="error">{keyError}</p>}
+        </div>
+      </main>
+    );
+  }
+
+  // Основной экран
   return (
     <main className="container">
       <h1>AiZavr</h1>
