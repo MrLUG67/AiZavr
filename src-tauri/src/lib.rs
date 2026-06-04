@@ -5,7 +5,18 @@ mod llm;
 mod tree;
 mod keychain;
 
+use db::{DbDialog, DbNode};
 use llm::{Message, openrouter::OpenRouterProvider, LlmProvider};
+
+// Обёртка для хранения пула в Tauri State.
+// Mutex нужен, потому что State требует Send + Sync.
+struct AppState {
+    db: sqlx::SqlitePool,
+}
+
+// ---------------------------------------------------------------------------
+// LLM
+// ---------------------------------------------------------------------------
 
 #[tauri::command]
 async fn send_message(
@@ -17,6 +28,118 @@ async fn send_message(
     let response = provider.send(messages, &model_id).await?;
     Ok(response.content)
 }
+
+// ---------------------------------------------------------------------------
+// Диалоги
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_create_dialog(
+    state: tauri::State<'_, AppState>,
+    title: String,
+    notebook_id: Option<String>,
+) -> Result<DbDialog, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    db::create_dialog(&state.db, &id, &title, notebook_id.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_get_dialog(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Option<DbDialog>, String> {
+    db::get_dialog(&state.db, &dialog_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_list_dialogs(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<DbDialog>, String> {
+    db::list_dialogs(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_update_dialog_title(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    title: String,
+) -> Result<(), String> {
+    db::update_dialog_title(&state.db, &dialog_id, &title)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Узлы
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_create_node(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    parent_id: Option<String>,
+    node_type: String,
+    content: String,
+    model_id: Option<String>,
+    model_role: Option<String>,
+    tokens_count: i64,
+) -> Result<DbNode, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    db::create_node(
+        &state.db,
+        &id,
+        &dialog_id,
+        parent_id.as_deref(),
+        &node_type,
+        &content,
+        model_id.as_deref(),
+        model_role.as_deref(),
+        tokens_count,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_get_branch(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Vec<DbNode>, String> {
+    db::get_branch(&state.db, &dialog_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_get_children(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<Vec<DbNode>, String> {
+    db::get_children(&state.db, &node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_set_active_child(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+    child_id: String,
+) -> Result<(), String> {
+    db::set_active_child(&state.db, &node_id, &child_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Точка входа
+// ---------------------------------------------------------------------------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,15 +153,28 @@ pub fn run() {
                 .to_string_lossy()
                 .to_string();
 
-            tauri::async_runtime::spawn(async move {
+            // Инициализируем БД синхронно в setup, чтобы State был готов
+            // до первого вызова команды.
+            let pool = tauri::async_runtime::block_on(async {
                 db::init_db(&app_data_dir)
                     .await
-                    .expect("failed to initialize database");
+                    .expect("failed to initialize database")
             });
 
+            app.manage(AppState { db: pool });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![send_message])
+        .invoke_handler(tauri::generate_handler![
+            send_message,
+            cmd_create_dialog,
+            cmd_get_dialog,
+            cmd_list_dialogs,
+            cmd_update_dialog_title,
+            cmd_create_node,
+            cmd_get_branch,
+            cmd_get_children,
+            cmd_set_active_child,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");
 }
