@@ -47,7 +47,7 @@ pub struct DbNode {
     pub id: String,
     pub parent_id: Option<String>,
     pub dialog_id: String,
-    pub node_type: String,      // user_message | assistant_message | system | ...
+    pub node_type: String,               // user_message | assistant_message | system | ...
     pub content: String,
     pub active_child_id: Option<String>,
     pub model_id: Option<String>,
@@ -56,8 +56,13 @@ pub struct DbNode {
     pub is_pinned: bool,
     pub is_protected: bool,
     pub compression_level: Option<String>,
-    pub extra: Option<String>,  // JSON
+    pub extra: Option<String>,           // JSON
     pub created_at: String,
+    // --- добавлено миграцией 002 ---
+    pub branch_name: Option<String>,          // D-046: имя ветки на Q-узлах точек ветвления
+    pub last_visited_leaf_id: Option<String>, // Q-027: последний активный лист этой ветки
+    // --- добавлено миграцией 003 ---
+    pub children_count: i64,                  // денормализованный счётчик детей A-узла
 }
 
 // ---------------------------------------------------------------------------
@@ -175,8 +180,10 @@ pub async fn update_dialog_leaf(
 
 /// Создать новый узел. Автоматически:
 /// - прописывает себя как active_child у родителя
+/// - инкрементирует children_count у родителя
 /// - если это первый узел диалога — устанавливает root_node_id
 /// - обновляет active_leaf_id диалога
+/// - проставляет branch_name = первые 128 символов content (для Q-узлов)
 pub async fn create_node(
     pool: &SqlitePool,
     id: &str,
@@ -188,10 +195,19 @@ pub async fn create_node(
     model_role: Option<&str>,
     tokens_count: i64,
 ) -> Result<DbNode, sqlx::Error> {
+    // branch_name проставляем сразу для user_message узлов
+    let branch_name: Option<String> = if node_type == "user_message" {
+        let name: String = content.chars().take(128).collect();
+        Some(name)
+    } else {
+        None
+    };
+
     sqlx::query(
         "INSERT INTO nodes
-            (id, dialog_id, parent_id, node_type, content, model_id, model_role, tokens_count)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            (id, dialog_id, parent_id, node_type, content,
+             model_id, model_role, tokens_count, branch_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(id)
     .bind(dialog_id)
@@ -201,12 +217,15 @@ pub async fn create_node(
     .bind(model_id)
     .bind(model_role)
     .bind(tokens_count)
+    .bind(&branch_name)
     .execute(pool)
     .await?;
 
     // Если есть родитель — прописываем себя как его active_child
+    // и инкрементируем children_count
     if let Some(pid) = parent_id {
         set_active_child(pool, pid, id).await?;
+        increment_children_count(pool, pid).await?;
     }
 
     // Если это первый узел диалога — устанавливаем root_node_id
@@ -237,7 +256,8 @@ pub async fn get_node(
     let row = sqlx::query(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, tokens_count, is_pinned, is_protected,
-                compression_level, extra, created_at
+                compression_level, extra, created_at,
+                branch_name, last_visited_leaf_id, children_count
          FROM nodes WHERE id = ?"
     )
     .bind(id)
@@ -255,7 +275,8 @@ pub async fn get_children(
     let rows = sqlx::query(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, tokens_count, is_pinned, is_protected,
-                compression_level, extra, created_at
+                compression_level, extra, created_at,
+                branch_name, last_visited_leaf_id, children_count
          FROM nodes WHERE parent_id = ? ORDER BY created_at ASC"
     )
     .bind(parent_id)
@@ -281,13 +302,61 @@ pub async fn set_active_child(
     Ok(())
 }
 
+/// Инкрементировать счётчик детей узла (вызывается при create_node).
+pub async fn increment_children_count(
+    pool: &SqlitePool,
+    node_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE nodes SET children_count = children_count + 1 WHERE id = ?"
+    )
+    .bind(node_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Установить имя ветки на Q-узле точки ветвления (D-046).
+/// Вызывается при ручном переименовании или после LLM-автогенерации.
+pub async fn set_branch_name(
+    pool: &SqlitePool,
+    node_id: &str,
+    name: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE nodes SET branch_name = ? WHERE id = ?"
+    )
+    .bind(name)
+    .bind(node_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Сохранить последний посещённый лист ветки (Q-027).
+/// Вызывается при уходе из ветки через Ctrl+Left/Right.
+/// node_id — Q-узел точки ветвления, leaf_id — текущий active_leaf диалога.
+pub async fn set_last_visited_leaf(
+    pool: &SqlitePool,
+    node_id: &str,
+    leaf_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE nodes SET last_visited_leaf_id = ? WHERE id = ?"
+    )
+    .bind(leaf_id)
+    .bind(node_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Получить активную ветку диалога — линейный путь от корня до активного листа.
 /// Именно этот список уходит в LLM при следующем запросе.
 pub async fn get_branch(
     pool: &SqlitePool,
     dialog_id: &str,
 ) -> Result<Vec<DbNode>, sqlx::Error> {
-    // Получаем корень и активный лист
     let dialog = get_dialog(pool, dialog_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
@@ -340,5 +409,8 @@ fn node_from_row(r: sqlx::sqlite::SqliteRow) -> DbNode {
         compression_level: r.get("compression_level"),
         extra: r.get("extra"),
         created_at: r.get("created_at"),
+        branch_name: r.get("branch_name"),
+        last_visited_leaf_id: r.get("last_visited_leaf_id"),
+        children_count: r.get("children_count"),
     }
 }

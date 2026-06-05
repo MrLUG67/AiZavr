@@ -75,6 +75,17 @@ async fn cmd_update_dialog_title(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn cmd_update_dialog_leaf(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    leaf_id: String,
+) -> Result<(), String> {
+    db::update_dialog_leaf(&state.db, &dialog_id, &leaf_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ---------------------------------------------------------------------------
 // Узлы
 // ---------------------------------------------------------------------------
@@ -107,6 +118,16 @@ async fn cmd_create_node(
 }
 
 #[tauri::command]
+async fn cmd_get_node(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<Option<DbNode>, String> {
+    db::get_node(&state.db, &node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn cmd_get_branch(
     state: tauri::State<'_, AppState>,
     dialog_id: String,
@@ -135,6 +156,60 @@ async fn cmd_set_active_child(
     db::set_active_child(&state.db, &node_id, &child_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_set_branch_name(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+    name: String,
+) -> Result<(), String> {
+    db::set_branch_name(&state.db, &node_id, &name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_set_last_visited_leaf(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+    leaf_id: String,
+) -> Result<(), String> {
+    db::set_last_visited_leaf(&state.db, &node_id, &leaf_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Дерево
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_branch_from_node(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    parent_id: String,
+    content: String,
+) -> Result<tree::BranchResult, String> {
+    tree::branch_from_node(&state.db, &dialog_id, &parent_id, &content).await
+}
+
+#[tauri::command]
+async fn cmd_select_branch(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    fork_node_id: String,
+    child_id: String,
+) -> Result<(), String> {
+    tree::select_branch(&state.db, &dialog_id, &fork_node_id, &child_id).await
+}
+
+#[tauri::command]
+async fn cmd_get_depth_indicators(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<tree::DepthIndicators, String> {
+    tree::get_depth_indicators(&state.db, &dialog_id).await
 }
 
 // ---------------------------------------------------------------------------
@@ -187,13 +262,20 @@ pub fn run() {
             cmd_get_dialog,
             cmd_list_dialogs,
             cmd_update_dialog_title,
+            cmd_update_dialog_leaf,
             cmd_create_node,
+            cmd_get_node,
             cmd_get_branch,
             cmd_get_children,
             cmd_set_active_child,
+            cmd_set_branch_name,
+            cmd_set_last_visited_leaf,
             cmd_set_api_key,
             cmd_get_api_key,
             cmd_delete_api_key,
+            cmd_branch_from_node,
+            cmd_select_branch,
+            cmd_get_depth_indicators,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");

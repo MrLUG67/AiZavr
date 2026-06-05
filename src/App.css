@@ -1,19 +1,10 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
-}
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
-
   color: #0f0f0f;
   background-color: #f6f6f6;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,47 +12,14 @@
   -webkit-text-size-adjust: 100%;
 }
 
-.container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
 a {
   font-weight: 500;
   color: #646cff;
   text-decoration: inherit;
 }
+a:hover { color: #535bf2; }
 
-a:hover {
-  color: #535bf2;
-}
-
-h1 {
-  text-align: center;
-}
-
-input,
-button {
+input, button {
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
@@ -71,29 +29,300 @@ button {
   color: #0f0f0f;
   background-color: #ffffff;
   transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
-}
-
-input,
-button {
+  box-shadow: 0 2px 2px rgba(0,0,0,0.2);
   outline: none;
 }
+button { cursor: pointer; }
+button:hover { border-color: #396cd8; }
+button:active { border-color: #396cd8; background-color: #e8e8e8; }
 
-#greet-input {
-  margin-right: 5px;
+/* ---------------------------------------------------------------------------
+   Layout
+--------------------------------------------------------------------------- */
+
+.container {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  text-align: left;
 }
+
+h1 {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 1.1em;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+
+/* ---------------------------------------------------------------------------
+   Depth indicators
+--------------------------------------------------------------------------- */
+
+.depth-indicators {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 8px;
+  min-height: 12px;
+}
+
+.depth-left, .depth-right {
+  display: flex;
+  gap: 3px;
+}
+
+.depth-bar {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  background-color: #396cd8;
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------------------
+   Fork overlay
+--------------------------------------------------------------------------- */
+
+.fork-overlay {
+  background: rgba(0,0,0,0.04);
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  padding: 10px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fork-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fork-title {
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.5;
+  letter-spacing: 0.05em;
+}
+
+.fork-close-btn {
+  padding: 2px 8px;
+  font-size: 0.85em;
+  box-shadow: none;
+  border: 1px solid rgba(0,0,0,0.15);
+  background: transparent;
+}
+
+.fork-cards {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.fork-cards::-webkit-scrollbar {
+  height: 4px;
+}
+.fork-cards::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 2px;
+}
+
+.fork-card {
+  flex-shrink: 0;
+  min-width: 160px;
+  max-width: 240px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-color: #396cd820;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.fork-card:hover {
+  background-color: #396cd830;
+}
+
+.fork-card--active {
+  border-color: #396cd8;
+  background-color: #396cd815;
+}
+
+.fork-card--current .fork-card-name {
+  font-weight: 600;
+}
+
+.fork-card-name {
+  display: block;
+  font-size: 0.9em;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fork-card-badge {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.72em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #396cd8;
+  color: white;
+  opacity: 0.8;
+}
+
+.fork-hint {
+  font-size: 0.75em;
+  opacity: 0.4;
+}
+
+/* ---------------------------------------------------------------------------
+   Messages
+--------------------------------------------------------------------------- */
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 80%;
+  display: flex;
+  flex-direction: column;
+}
+
+.message.user {
+  align-self: flex-end;
+}
+
+.message.assistant {
+  align-self: flex-start;
+}
+
+.message-content {
+  padding: 10px 14px;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+
+.message.user .message-content {
+  background-color: #396cd8;
+  color: white;
+}
+
+.message.assistant .message-content {
+  background-color: rgba(0,0,0,0.07);
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* Панель действий под A-узлом */
+.message-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+/* Кнопка ветвления */
+.branch-btn {
+  padding: 2px 8px;
+  font-size: 0.85em;
+  border-radius: 50%;
+  border: 1px solid #396cd8;
+  color: #396cd8;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1.4;
+  box-shadow: none;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+.branch-btn:hover { opacity: 1; background: #396cd820; border-color: #396cd8; }
+
+/* Кнопка развилки */
+.fork-btn {
+  padding: 2px 8px;
+  font-size: 0.9em;
+  border-radius: 6px;
+  border: 1px solid #e67e22;
+  color: #e67e22;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1.4;
+  box-shadow: none;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.fork-btn:hover { opacity: 1; background: #e67e2215; border-color: #e67e22; }
+
+/* Branch input */
+.branch-input-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.branch-input-row input {
+  flex: 1;
+  font-size: 0.9em;
+  padding: 6px 10px;
+}
+.branch-input-row button {
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+
+/* ---------------------------------------------------------------------------
+   Main input row
+--------------------------------------------------------------------------- */
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(0,0,0,0.1);
+}
+.input-row input { flex: 1; }
+
+/* ---------------------------------------------------------------------------
+   Setup screen
+--------------------------------------------------------------------------- */
+
+.setup {
+  padding: 40px 24px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.error {
+  color: #c0392b;
+  font-size: 0.9em;
+  margin-top: 8px;
+}
+
+.loading {
+  font-size: 0.9em;
+  opacity: 0.5;
+  align-self: flex-start;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark mode
+--------------------------------------------------------------------------- */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -101,16 +330,40 @@ button {
     background-color: #2f2f2f;
   }
 
-  a:hover {
-    color: #24c8db;
-  }
+  a:hover { color: #24c8db; }
 
-  input,
-  button {
+  input, button {
     color: #ffffff;
     background-color: #0f0f0f98;
   }
-  button:active {
-    background-color: #0f0f0f69;
+  button:active { background-color: #0f0f0f69; }
+
+  h1 { border-bottom-color: rgba(255,255,255,0.1); }
+
+  .message.assistant .message-content {
+    background-color: rgba(255,255,255,0.08);
+  }
+
+  .depth-bar { background-color: #61a0ff; }
+
+  .input-row { border-top-color: rgba(255,255,255,0.1); }
+
+  .fork-overlay {
+    background: rgba(255,255,255,0.03);
+    border-bottom-color: rgba(255,255,255,0.1);
+  }
+
+  .fork-card {
+    background-color: rgba(97,160,255,0.12);
+  }
+  .fork-card:hover {
+    background-color: rgba(97,160,255,0.2);
+  }
+  .fork-card--active {
+    border-color: #61a0ff;
+    background-color: rgba(97,160,255,0.1);
+  }
+  .fork-close-btn {
+    border-color: rgba(255,255,255,0.2);
   }
 }
