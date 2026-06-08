@@ -76,6 +76,17 @@ function App() {
   const [forkCards, setForkCards] = useState<BranchCard[]>([]);
   const [forkActiveIdx, setForkActiveIdx] = useState(0);
   const cardsRef = useRef<HTMLDivElement>(null);
+  // Контейнер сообщений и элементы каждого сообщения — для позиционно-зависимого Ctrl+Up
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const messageEls = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Редактирование имени карточки
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null); // Q-узел в редактировании
+  const [editingText, setEditingText] = useState("");
+  // Открытое контекстное меню карточки (по символу ⋮)
+  const [menuNodeId, setMenuNodeId] = useState<string | null>(null);
+  // Таймер для различения одиночного и двойного клика по карточке
+  const clickTimer = useRef<number | null>(null);
 
   // API key
   const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
@@ -101,6 +112,18 @@ function App() {
   // Клавиатурная навигация
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      // Во время редактирования имени карточки глобальная навигация отключена —
+      // Enter/Esc обрабатываются на самом input (saveEditing/cancelEditing).
+      if (editingNodeId) return;
+
+      // F2 — начать редактирование карточки в фокусе (режим развилки)
+      if (e.key === "F2" && forkMode) {
+        e.preventDefault();
+        const card = forkCards[forkActiveIdx];
+        if (card) startEditing(card.nodeId);
+        return;
+      }
+
       // Enter в режиме развилки — выбор активной карточки (без Ctrl)
       if (e.key === "Enter" && forkMode) {
         e.preventDefault();
@@ -126,7 +149,7 @@ function App() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [forkMode, forkCards, forkActiveIdx, messages, dialogId]);
+  }, [forkMode, forkCards, forkActiveIdx, messages, dialogId, editingNodeId]);
 
   // Скролл карточек колесом мыши
   useEffect(() => {
@@ -200,9 +223,16 @@ function App() {
   }
 
   async function closeForkMode() {
+    if (clickTimer.current !== null) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
     setForkMode(false);
     setForkNodeId(null);
     setForkCards([]);
+    setEditingNodeId(null);
+    setEditingText("");
+    setMenuNodeId(null);
   }
 
   // Выбрать ветку в режиме развилки — атомарно на backend.
@@ -225,17 +255,87 @@ function App() {
     await loadBranch(dialogId);
   }
 
-  // Ctrl+Up — найти ближайший A-узел с children_count > 1 вверх по ветке
+  // --- Редактирование имени карточки ---
+
+  // Начать редактирование карточки idx
+  function startEditing(nodeId: string) {
+    const card = forkCards.find(c => c.nodeId === nodeId);
+    if (!card) return;
+    setMenuNodeId(null);
+    setEditingNodeId(nodeId);
+    setEditingText(card.branchName);
+  }
+
+  function cancelEditing() {
+    setEditingNodeId(null);
+    setEditingText("");
+  }
+
+  // Сохранить новое имя в БД и обновить карточку локально
+  async function saveEditing() {
+    if (!editingNodeId) return;
+    const name = editingText.trim();
+    if (!name) { cancelEditing(); return; } // пустое имя не сохраняем
+
+    try {
+      await invoke("cmd_set_branch_name", { nodeId: editingNodeId, name });
+      setForkCards(cards =>
+        cards.map(c => (c.nodeId === editingNodeId ? { ...c, branchName: name } : c))
+      );
+    } catch (e) {
+      console.error("set_branch_name failed:", e);
+    }
+    cancelEditing();
+  }
+
+  // Одиночный клик по карточке = выбрать ветку, но с задержкой,
+  // чтобы двойной клик (редактирование) не вызывал заодно выбор.
+  // Каждый новый клик отменяет предыдущий отложенный — выигрывает последний.
+  function handleCardClick(idx: number) {
+    if (clickTimer.current !== null) {
+      clearTimeout(clickTimer.current);
+    }
+    clickTimer.current = window.setTimeout(() => {
+      clickTimer.current = null;
+      selectForkCard(idx);
+    }, 220);
+  }
+
+  function handleCardDoubleClick(nodeId: string) {
+    if (clickTimer.current !== null) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    startEditing(nodeId);
+  }
+
+  // Ctrl+Up — идём вверх от нижнего края экрана.
+  // Находим самую глубокую развилку, начинающуюся выше нижнего края видимой области.
+  // Если развилок выше нет — просто прокручиваем беседу наверх.
   function handleCtrlUp() {
     if (forkMode) return;
-    // Идём по messages снизу вверх, ищем assistant с childrenCount > 1
+    const container = messagesRef.current;
+    if (!container) return;
+
+    const containerTop = container.getBoundingClientRect().top;
+    const viewportHeight = container.clientHeight;
+
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m.role === "assistant" && m.childrenCount > 1) {
+      if (m.role !== "assistant" || m.childrenCount <= 1) continue;
+      const el = messageEls.current[i];
+      if (!el) continue;
+      // позиция верха сообщения относительно видимого верха контейнера
+      const relTop = el.getBoundingClientRect().top - containerTop;
+      // развилка начинается выше нижнего края экрана — берём её
+      if (relTop < viewportHeight) {
         openForkMode(m.nodeId);
         return;
       }
     }
+
+    // развилок выше нет — прокручиваем к началу беседы
+    container.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   // Ctrl+Down — «провалиться» в выбранную ветку (D-045): подтвердить выбор.
@@ -426,22 +526,64 @@ function App() {
               <div
                 key={card.nodeId}
                 className={`fork-card ${idx === forkActiveIdx ? "fork-card--active" : ""} ${card.isActive ? "fork-card--current" : ""}`}
-                onClick={() => selectForkCard(idx)}
                 onMouseEnter={() => setForkActiveIdx(idx)}
+                onClick={() => { if (editingNodeId !== card.nodeId) handleCardClick(idx); }}
+                onDoubleClick={() => handleCardDoubleClick(card.nodeId)}
               >
-                <span className="fork-card-name">{card.branchName}</span>
-                {card.isActive && <span className="fork-card-badge">текущая</span>}
+                {editingNodeId === card.nodeId ? (
+                  <input
+                    className="fork-card-edit"
+                    autoFocus
+                    value={editingText}
+                    onChange={e => setEditingText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { e.preventDefault(); saveEditing(); }
+                      else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
+                    }}
+                    onBlur={saveEditing}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <>
+                    <span className="fork-card-name">{card.branchName}</span>
+                    {card.isActive && <span className="fork-card-badge">текущая</span>}
+
+                    {/* Кнопка контекстного меню — появляется при наведении */}
+                    <button
+                      className="fork-card-menu-btn"
+                      title="Меню ветки"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMenuNodeId(menuNodeId === card.nodeId ? null : card.nodeId);
+                      }}
+                    >
+                      ⋮
+                    </button>
+
+                    {/* Контекстное меню */}
+                    {menuNodeId === card.nodeId && (
+                      <div className="fork-card-menu" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => startEditing(card.nodeId)}>Редактировать</button>
+                        {/* Пункт "Удалить" — после реализации мягкого удаления ветви */}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             ))}
           </div>
-          <div className="fork-hint">Ctrl+← → или мышь — выбор · Enter / Ctrl+↓ / клик — перейти · ✕ — отмена</div>
+          <div className="fork-hint">Ctrl+← → или мышь — выбор · Enter / Ctrl+↓ / клик — перейти · двойной клик / F2 — переименовать · ✕ — отмена</div>
         </div>
       )}
 
       {/* Сообщения */}
-      <div className="messages">
+      <div className="messages" ref={messagesRef}>
         {messages.map((m, i) => (
-          <div key={i} className={`message ${m.role}`}>
+          <div
+            key={i}
+            className={`message ${m.role}`}
+            ref={el => { messageEls.current[i] = el; }}
+          >
             <div className="message-content">
               <p>{m.content}</p>
             </div>

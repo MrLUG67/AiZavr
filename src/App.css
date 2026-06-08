@@ -143,6 +143,7 @@ h1 {
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
 }
 
 .fork-card:hover {
@@ -176,6 +177,72 @@ h1 {
   background: #396cd8;
   color: white;
   opacity: 0.8;
+}
+
+/* Поле редактирования имени карточки */
+.fork-card-edit {
+  width: 100%;
+  font-size: 0.9em;
+  padding: 4px 6px;
+  border: 1px solid #396cd8;
+  border-radius: 6px;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+/* Кнопка контекстного меню ⋮ — видна при наведении на карточку */
+.fork-card-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 0 6px;
+  font-size: 1em;
+  line-height: 1.2;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: pointer;
+}
+
+.fork-card:hover .fork-card-menu-btn {
+  opacity: 0.5;
+}
+.fork-card-menu-btn:hover {
+  opacity: 1 !important;
+  background: rgba(0,0,0,0.08);
+}
+
+/* Контекстное меню карточки */
+.fork-card-menu {
+  position: absolute;
+  top: 26px;
+  right: 4px;
+  z-index: 10;
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+}
+
+.fork-card-menu button {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.fork-card-menu button:hover {
+  background: #396cd815;
+  border-color: transparent;
 }
 
 .fork-hint {
@@ -365,5 +432,21 @@ h1 {
   }
   .fork-close-btn {
     border-color: rgba(255,255,255,0.2);
+  }
+
+  .fork-card-menu {
+    background: #1f1f1f;
+    border-color: rgba(255,255,255,0.15);
+  }
+  .fork-card-menu button:hover {
+    background: rgba(97,160,255,0.18);
+  }
+  .fork-card-menu-btn:hover {
+    background: rgba(255,255,255,0.1);
+  }
+  .fork-card-edit {
+    border-color: #61a0ff;
+    background-color: #0f0f0f98;
+    color: #ffffff;
   }
 }
