@@ -12,6 +12,13 @@
   -webkit-text-size-adjust: 100%;
 }
 
+html, body {
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 a {
   font-weight: 500;
   color: #646cff;
@@ -388,6 +395,85 @@ h1 {
 }
 
 /* ---------------------------------------------------------------------------
+   Deleted branch indicator & restore overlay (D-050)
+--------------------------------------------------------------------------- */
+
+/* Зачёркнутый ⑂ — индикатор удалённых веток в подвале A-узла */
+.fork-btn--deleted {
+  padding: 2px 8px;
+  font-size: 0.9em;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.2);
+  color: rgba(0,0,0,0.35);
+  background: transparent;
+  cursor: pointer;
+  line-height: 1.4;
+  box-shadow: none;
+  text-decoration: line-through;
+  transition: opacity 0.2s;
+}
+.fork-btn--deleted:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.3);
+}
+
+/* Overlay восстановления удалённых веток */
+.deleted-overlay {
+  background: rgba(0,0,0,0.03);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 10px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deleted-title {
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.4;
+  letter-spacing: 0.05em;
+}
+
+.deleted-card {
+  flex-shrink: 0;
+  min-width: 160px;
+  max-width: 240px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px dashed rgba(0,0,0,0.2);
+  background-color: rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deleted-card-name {
+  font-size: 0.9em;
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.restore-btn {
+  align-self: flex-start;
+  padding: 3px 10px;
+  font-size: 0.8em;
+  border-radius: 6px;
+  border: 1px solid #27ae60;
+  color: #27ae60;
+  background: transparent;
+  cursor: pointer;
+  box-shadow: none;
+}
+.restore-btn:hover {
+  background: #27ae6015;
+  border-color: #27ae60;
+}
+
+/* ---------------------------------------------------------------------------
    Dark mode
 --------------------------------------------------------------------------- */
 
@@ -448,5 +534,24 @@ h1 {
     border-color: #61a0ff;
     background-color: #0f0f0f98;
     color: #ffffff;
+  }
+
+  .fork-btn--deleted {
+    color: rgba(255,255,255,0.3);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .fork-btn--deleted:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.25);
+  }
+
+  .deleted-overlay {
+    background: rgba(255,255,255,0.02);
+    border-bottom-color: rgba(255,255,255,0.08);
+  }
+
+  .deleted-card {
+    border-color: rgba(255,255,255,0.15);
+    background-color: rgba(255,255,255,0.03);
   }
 }

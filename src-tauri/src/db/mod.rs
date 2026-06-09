@@ -59,17 +59,18 @@ pub struct DbNode {
     pub extra: Option<String>,           // JSON
     pub created_at: String,
     // --- добавлено миграцией 002 ---
-    pub branch_name: Option<String>,          // D-046: имя ветки на Q-узлах точек ветвления
-    pub last_visited_leaf_id: Option<String>, // Q-027: последний активный лист этой ветки
+    pub branch_name: Option<String>,
+    pub last_visited_leaf_id: Option<String>,
     // --- добавлено миграцией 003 ---
-    pub children_count: i64,                  // денормализованный счётчик детей A-узла
+    pub children_count: i64,             // полный счётчик, включая удалённые
+    // --- добавлено миграцией 004 ---
+    pub is_deleted: bool,                // D-048: мягкое удаление
 }
 
 // ---------------------------------------------------------------------------
 // Диалоги
 // ---------------------------------------------------------------------------
 
-/// Создать новый диалог. Возвращает созданный DbDialog.
 pub async fn create_dialog(
     pool: &SqlitePool,
     id: &str,
@@ -88,7 +89,6 @@ pub async fn create_dialog(
     get_dialog(pool, id).await?.ok_or(sqlx::Error::RowNotFound)
 }
 
-/// Получить диалог по id.
 pub async fn get_dialog(
     pool: &SqlitePool,
     id: &str,
@@ -114,7 +114,6 @@ pub async fn get_dialog(
     }))
 }
 
-/// Список всех диалогов, отсортированных по дате обновления (новые первые).
 pub async fn list_dialogs(
     pool: &SqlitePool,
 ) -> Result<Vec<DbDialog>, sqlx::Error> {
@@ -138,7 +137,6 @@ pub async fn list_dialogs(
     }).collect())
 }
 
-/// Обновить заголовок диалога.
 pub async fn update_dialog_title(
     pool: &SqlitePool,
     dialog_id: &str,
@@ -155,7 +153,6 @@ pub async fn update_dialog_title(
     Ok(())
 }
 
-/// Обновить указатель на активный лист (позиция курсора в дереве).
 pub async fn update_dialog_leaf(
     pool: &SqlitePool,
     dialog_id: &str,
@@ -178,12 +175,6 @@ pub async fn update_dialog_leaf(
 // Узлы
 // ---------------------------------------------------------------------------
 
-/// Создать новый узел. Автоматически:
-/// - прописывает себя как active_child у родителя
-/// - инкрементирует children_count у родителя
-/// - если это первый узел диалога — устанавливает root_node_id
-/// - обновляет active_leaf_id диалога
-/// - проставляет branch_name = первые 128 символов content (для Q-узлов)
 pub async fn create_node(
     pool: &SqlitePool,
     id: &str,
@@ -195,7 +186,6 @@ pub async fn create_node(
     model_role: Option<&str>,
     tokens_count: i64,
 ) -> Result<DbNode, sqlx::Error> {
-    // branch_name проставляем сразу для user_message узлов
     let branch_name: Option<String> = if node_type == "user_message" {
         let name: String = content.chars().take(128).collect();
         Some(name)
@@ -221,34 +211,26 @@ pub async fn create_node(
     .execute(pool)
     .await?;
 
-    // Если есть родитель — прописываем себя как его active_child
-    // и инкрементируем children_count
     if let Some(pid) = parent_id {
         set_active_child(pool, pid, id).await?;
         increment_children_count(pool, pid).await?;
     }
 
-    // Если это первый узел диалога — устанавливаем root_node_id
     let dialog = get_dialog(pool, dialog_id).await?;
     if let Some(d) = dialog {
         if d.root_node_id.is_none() {
-            sqlx::query(
-                "UPDATE dialogs SET root_node_id = ? WHERE id = ?"
-            )
-            .bind(id)
-            .bind(dialog_id)
-            .execute(pool)
-            .await?;
+            sqlx::query("UPDATE dialogs SET root_node_id = ? WHERE id = ?")
+                .bind(id)
+                .bind(dialog_id)
+                .execute(pool)
+                .await?;
         }
     }
 
-    // Обновляем курсор диалога на этот узел
     update_dialog_leaf(pool, dialog_id, id).await?;
-
     get_node(pool, id).await?.ok_or(sqlx::Error::RowNotFound)
 }
 
-/// Получить узел по id.
 pub async fn get_node(
     pool: &SqlitePool,
     id: &str,
@@ -257,7 +239,7 @@ pub async fn get_node(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, tokens_count, is_pinned, is_protected,
                 compression_level, extra, created_at,
-                branch_name, last_visited_leaf_id, children_count
+                branch_name, last_visited_leaf_id, children_count, is_deleted
          FROM nodes WHERE id = ?"
     )
     .bind(id)
@@ -267,7 +249,7 @@ pub async fn get_node(
     Ok(row.map(node_from_row))
 }
 
-/// Получить прямых детей узла (все ветки от данной точки).
+/// Видимые дети узла (is_deleted = 0). Основной путь навигации.
 pub async fn get_children(
     pool: &SqlitePool,
     parent_id: &str,
@@ -276,8 +258,8 @@ pub async fn get_children(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, tokens_count, is_pinned, is_protected,
                 compression_level, extra, created_at,
-                branch_name, last_visited_leaf_id, children_count
-         FROM nodes WHERE parent_id = ? ORDER BY created_at ASC"
+                branch_name, last_visited_leaf_id, children_count, is_deleted
+         FROM nodes WHERE parent_id = ? AND is_deleted = 0 ORDER BY created_at ASC"
     )
     .bind(parent_id)
     .fetch_all(pool)
@@ -286,23 +268,81 @@ pub async fn get_children(
     Ok(rows.into_iter().map(node_from_row).collect())
 }
 
-/// Установить active_child у узла — определяет, какая ветка «активна».
-pub async fn set_active_child(
+/// Удалённые дети узла (is_deleted = 1). Для индикатора ⑂ в подвале A-узла (D-050).
+pub async fn get_deleted_children(
+    pool: &SqlitePool,
+    parent_id: &str,
+) -> Result<Vec<DbNode>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
+                model_id, model_role, tokens_count, is_pinned, is_protected,
+                compression_level, extra, created_at,
+                branch_name, last_visited_leaf_id, children_count, is_deleted
+         FROM nodes WHERE parent_id = ? AND is_deleted = 1 ORDER BY created_at ASC"
+    )
+    .bind(parent_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(node_from_row).collect())
+}
+
+/// Мягкое удаление ветки: помечает узел и всё его поддерево как is_deleted = 1.
+/// Безопасно — в дереве нет сходящихся веток, поддерево изолировано (D-048).
+/// Если node_id — активная ветка диалога, вызывающий код должен
+/// сначала переключить active_leaf на другую видимую ветку.
+pub async fn delete_branch(
     pool: &SqlitePool,
     node_id: &str,
-    child_id: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE nodes SET active_child_id = ? WHERE id = ?"
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT id FROM nodes WHERE id = ?
+             UNION ALL
+             SELECT n.id FROM nodes n
+             INNER JOIN subtree s ON n.parent_id = s.id
+         )
+         UPDATE nodes SET is_deleted = 1 WHERE id IN (SELECT id FROM subtree)"
     )
-    .bind(child_id)
     .bind(node_id)
     .execute(pool)
     .await?;
     Ok(())
 }
 
-/// Инкрементировать счётчик детей узла (вызывается при create_node).
+/// Восстановление ветки: снимает is_deleted = 1 с узла и всего поддерева.
+pub async fn restore_branch(
+    pool: &SqlitePool,
+    node_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT id FROM nodes WHERE id = ?
+             UNION ALL
+             SELECT n.id FROM nodes n
+             INNER JOIN subtree s ON n.parent_id = s.id
+         )
+         UPDATE nodes SET is_deleted = 0 WHERE id IN (SELECT id FROM subtree)"
+    )
+    .bind(node_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn set_active_child(
+    pool: &SqlitePool,
+    node_id: &str,
+    child_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE nodes SET active_child_id = ? WHERE id = ?")
+        .bind(child_id)
+        .bind(node_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn increment_children_count(
     pool: &SqlitePool,
     node_id: &str,
@@ -316,26 +356,19 @@ pub async fn increment_children_count(
     Ok(())
 }
 
-/// Установить имя ветки на Q-узле точки ветвления (D-046).
-/// Вызывается при ручном переименовании или после LLM-автогенерации.
 pub async fn set_branch_name(
     pool: &SqlitePool,
     node_id: &str,
     name: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE nodes SET branch_name = ? WHERE id = ?"
-    )
-    .bind(name)
-    .bind(node_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE nodes SET branch_name = ? WHERE id = ?")
+        .bind(name)
+        .bind(node_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
-/// Сохранить последний посещённый лист ветки (Q-027).
-/// Вызывается при уходе из ветки через Ctrl+Left/Right.
-/// node_id — Q-узел точки ветвления, leaf_id — текущий active_leaf диалога.
 pub async fn set_last_visited_leaf(
     pool: &SqlitePool,
     node_id: &str,
@@ -351,8 +384,6 @@ pub async fn set_last_visited_leaf(
     Ok(())
 }
 
-/// Получить активную ветку диалога — линейный путь от корня до активного листа.
-/// Именно этот список уходит в LLM при следующем запросе.
 pub async fn get_branch(
     pool: &SqlitePool,
     dialog_id: &str,
@@ -366,7 +397,6 @@ pub async fn get_branch(
         None => return Ok(vec![]),
     };
 
-    // Идём от листа вверх по parent_id, собираем путь
     let mut branch: Vec<DbNode> = Vec::new();
     let mut current_id = leaf_id;
 
@@ -380,11 +410,10 @@ pub async fn get_branch(
 
         match parent_id {
             Some(pid) => current_id = pid,
-            None => break, // дошли до корня
+            None => break,
         }
     }
 
-    // Разворачиваем: теперь порядок от корня к листу
     branch.reverse();
     Ok(branch)
 }
@@ -412,5 +441,6 @@ fn node_from_row(r: sqlx::sqlite::SqliteRow) -> DbNode {
         branch_name: r.get("branch_name"),
         last_visited_leaf_id: r.get("last_visited_leaf_id"),
         children_count: r.get("children_count"),
+        is_deleted: r.get::<i64, _>("is_deleted") != 0,
     }
 }

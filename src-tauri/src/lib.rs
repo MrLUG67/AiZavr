@@ -147,6 +147,17 @@ async fn cmd_get_children(
         .map_err(|e| e.to_string())
 }
 
+/// Удалённые дети узла — для индикатора ⑂ в подвале A-узла (D-050).
+#[tauri::command]
+async fn cmd_get_deleted_children(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<Vec<DbNode>, String> {
+    db::get_deleted_children(&state.db, &node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn cmd_set_active_child(
     state: tauri::State<'_, AppState>,
@@ -202,6 +213,27 @@ async fn cmd_select_branch(
     child_id: String,
 ) -> Result<(), String> {
     tree::select_branch(&state.db, &dialog_id, &fork_node_id, &child_id).await
+}
+
+/// Мягкое удаление ветки (D-048, D-049).
+/// fork_node_id — A-узел развилки, child_id — удаляемый Q-узел.
+#[tauri::command]
+async fn cmd_delete_branch(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    fork_node_id: String,
+    child_id: String,
+) -> Result<(), String> {
+    tree::delete_branch_atomic(&state.db, &dialog_id, &fork_node_id, &child_id).await
+}
+
+/// Восстановление удалённой ветки (D-050).
+#[tauri::command]
+async fn cmd_restore_branch(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<(), String> {
+    tree::restore_branch_atomic(&state.db, &node_id).await
 }
 
 #[tauri::command]
@@ -267,6 +299,7 @@ pub fn run() {
             cmd_get_node,
             cmd_get_branch,
             cmd_get_children,
+            cmd_get_deleted_children,
             cmd_set_active_child,
             cmd_set_branch_name,
             cmd_set_last_visited_leaf,
@@ -275,6 +308,8 @@ pub fn run() {
             cmd_delete_api_key,
             cmd_branch_from_node,
             cmd_select_branch,
+            cmd_delete_branch,
+            cmd_restore_branch,
             cmd_get_depth_indicators,
         ])
         .run(tauri::generate_context!())

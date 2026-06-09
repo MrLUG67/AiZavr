@@ -11,8 +11,6 @@ pub struct BranchResult {
 }
 
 /// Создать новую ветку от указанного родительского узла.
-/// parent_id — A-узел от которого ветвимся.
-/// Новый Q-узел становится активным потомком родителя.
 pub async fn branch_from_node(
     pool: &SqlitePool,
     dialog_id: &str,
@@ -35,10 +33,6 @@ pub async fn branch_from_node(
     .await
     .map_err(|e| e.to_string())?;
 
-    // create_node уже прописал active_child у родителя, инкрементировал
-    // children_count и обновил active_leaf. Возвращаем id нового узла —
-    // фронт будет ждать ответа модели и создаст A-узел следом.
-
     Ok(BranchResult {
         new_node_id: id,
         dialog_id: dialog_id.to_string(),
@@ -49,12 +43,6 @@ pub async fn branch_from_node(
 ///
 /// fork_node_id — A-узел развилки.
 /// child_id     — выбранный Q-узел (одна из веток).
-///
-/// Делает за один заход:
-/// 1. Сохраняет позицию текущей активной ветки в её Q-узле (last_visited_leaf_id).
-/// 2. Переключает active_child развилки на выбранный Q-узел.
-/// 3. Определяет лист выбранной ветки (запомненный или самый глубокий по active_child).
-/// 4. Обновляет курсор диалога (active_leaf_id) на этот лист.
 pub async fn select_branch(
     pool: &SqlitePool,
     dialog_id: &str,
@@ -106,7 +94,67 @@ pub async fn select_branch(
     Ok(())
 }
 
-/// Спуститься по цепочке active_child от start_id до листа. Возвращает id листа.
+/// Мягкое удаление ветки (атомарно, D-048, D-049).
+///
+/// fork_node_id — A-узел развилки (родитель удаляемого Q-узла).
+/// child_id     — Q-узел удаляемой ветки.
+///
+/// Последовательность:
+/// 1. Проверяет что видимых веток > 1 (запрет удаления последней, D-049).
+/// 2. Если child_id — активная ветка, сначала переключается на другую видимую.
+/// 3. Помечает child_id и всё его поддерево как is_deleted = 1.
+pub async fn delete_branch_atomic(
+    pool: &SqlitePool,
+    dialog_id: &str,
+    fork_node_id: &str,
+    child_id: &str,
+) -> Result<(), String> {
+    // 1. Считаем видимые ветки.
+    let visible = db::get_children(pool, fork_node_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if visible.len() <= 1 {
+        return Err("cannot delete last visible branch".to_string());
+    }
+
+    // 2. Если удаляем активную ветку — сначала переключиться.
+    let fork_node = db::get_node(pool, fork_node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "fork node not found".to_string())?;
+
+    if fork_node.active_child_id.as_deref() == Some(child_id) {
+        let other = visible
+            .iter()
+            .find(|n| n.id != child_id)
+            .ok_or_else(|| "no other visible branch found".to_string())?;
+
+        let other_id = other.id.clone();
+        select_branch(pool, dialog_id, fork_node_id, &other_id).await?;
+    }
+
+    // 3. Мягкое удаление поддерева.
+    db::delete_branch(pool, child_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Восстановление удалённой ветки (D-050).
+/// Снимает is_deleted с узла и всего поддерева.
+/// Навигацию не меняет — пользователь сам переходит в ветку если нужно.
+pub async fn restore_branch_atomic(
+    pool: &SqlitePool,
+    node_id: &str,
+) -> Result<(), String> {
+    db::restore_branch(pool, node_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Спуститься по цепочке active_child от start_id до листа.
 async fn walk_to_leaf(pool: &SqlitePool, start_id: &str) -> Result<String, String> {
     let mut current = start_id.to_string();
     loop {
@@ -116,7 +164,7 @@ async fn walk_to_leaf(pool: &SqlitePool, start_id: &str) -> Result<String, Strin
         match node {
             Some(n) => match n.active_child_id {
                 Some(child) => current = child,
-                None => return Ok(current), // лист
+                None => return Ok(current),
             },
             None => return Ok(current),
         }
@@ -126,10 +174,7 @@ async fn walk_to_leaf(pool: &SqlitePool, start_id: &str) -> Result<String, Strin
 /// Индикаторы глубины для UI.
 #[derive(Debug, serde::Serialize)]
 pub struct DepthIndicators {
-    /// Полоски слева: глубина текущей ветки от корня.
     pub depth_left: usize,
-    /// Полоски справа: количество узлов в активной ветке
-    /// у которых есть неактивные дочерние ветки.
     pub branches_right: usize,
 }
 
@@ -150,21 +195,23 @@ pub async fn get_depth_indicators(
     let mut branches_right: usize = 0;
 
     for node in &branch {
+        // depth_left: узел находится на ответвлении (есть видимые сёстры).
         if let Some(parent_id) = &node.parent_id {
             let siblings = db::get_children(pool, parent_id)
                 .await
                 .map_err(|e| e.to_string())?;
-
             if siblings.len() > 1 {
-                // У этого узла есть сёстры — мы на ответвлении
                 depth_left += 1;
             }
         }
 
-        // Считаем неактивные дочерние ветки у узлов активной ветки.
-        // Используем children_count чтобы не грузить детей лишний раз,
-        // но active_child_id != None означает что хотя бы один активен.
-        if node.children_count > 1 {
+        // branches_right: у узла есть несколько видимых дочерних веток.
+        // Используем get_children (фильтрует is_deleted=0), а не children_count
+        // — children_count считает всех включая удалённые.
+        let children = db::get_children(pool, &node.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        if children.len() > 1 {
             branches_right += 1;
         }
     }

@@ -15,7 +15,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   nodeId: string;
-  childrenCount: number; // children_count A-узла
+  childrenCount: number;         // total, включая удалённые
+  deletedChildrenCount: number;  // только удалённые (D-050)
 }
 
 interface DbDialog {
@@ -35,6 +36,7 @@ interface DbNode {
   children_count: number;
   branch_name: string | null;
   last_visited_leaf_id: string | null;
+  is_deleted: boolean;
 }
 
 interface DepthIndicators {
@@ -47,11 +49,10 @@ interface BranchResult {
   dialog_id: string;
 }
 
-// Карточка в режиме развилки
 interface BranchCard {
-  nodeId: string;       // id Q-узла
-  branchName: string;   // branch_name ?? первые 80 символов контента
-  isActive: boolean;    // это активная ветка?
+  nodeId: string;
+  branchName: string;
+  isActive: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,20 +73,23 @@ function App() {
 
   // Режим развилки
   const [forkMode, setForkMode] = useState(false);
-  const [forkNodeId, setForkNodeId] = useState<string | null>(null); // id A-узла развилки
+  const [forkNodeId, setForkNodeId] = useState<string | null>(null);
   const [forkCards, setForkCards] = useState<BranchCard[]>([]);
   const [forkActiveIdx, setForkActiveIdx] = useState(0);
   const cardsRef = useRef<HTMLDivElement>(null);
-  // Контейнер сообщений и элементы каждого сообщения — для позиционно-зависимого Ctrl+Up
+
+  // Режим восстановления удалённых веток (D-050)
+  const [deletedMode, setDeletedMode] = useState(false);
+  const [deletedForkNodeId, setDeletedForkNodeId] = useState<string | null>(null);
+  const [deletedForkCards, setDeletedForkCards] = useState<BranchCard[]>([]);
+
   const messagesRef = useRef<HTMLDivElement>(null);
   const messageEls = useRef<(HTMLDivElement | null)[]>([]);
 
   // Редактирование имени карточки
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null); // Q-узел в редактировании
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
-  // Открытое контекстное меню карточки (по символу ⋮)
   const [menuNodeId, setMenuNodeId] = useState<string | null>(null);
-  // Таймер для различения одиночного и двойного клика по карточке
   const clickTimer = useRef<number | null>(null);
 
   // API key
@@ -109,14 +113,10 @@ function App() {
     init().catch(console.error);
   }, []);
 
-  // Клавиатурная навигация
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      // Во время редактирования имени карточки глобальная навигация отключена —
-      // Enter/Esc обрабатываются на самом input (saveEditing/cancelEditing).
       if (editingNodeId) return;
 
-      // F2 — начать редактирование карточки в фокусе (режим развилки)
       if (e.key === "F2" && forkMode) {
         e.preventDefault();
         const card = forkCards[forkActiveIdx];
@@ -124,7 +124,6 @@ function App() {
         return;
       }
 
-      // Enter в режиме развилки — выбор активной карточки (без Ctrl)
       if (e.key === "Enter" && forkMode) {
         e.preventDefault();
         selectForkCard(forkActiveIdx);
@@ -151,7 +150,6 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [forkMode, forkCards, forkActiveIdx, messages, dialogId, editingNodeId]);
 
-  // Скролл карточек колесом мыши
   useEffect(() => {
     const el = cardsRef.current;
     if (!el) return;
@@ -182,14 +180,25 @@ function App() {
   async function loadBranch(dId: string) {
     const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId: dId });
 
-    const restored: Message[] = branch
-      .filter(n => n.node_type === "user_message" || n.node_type === "assistant_message")
-      .map(n => ({
-        role: n.node_type === "user_message" ? "user" : "assistant",
-        content: n.content,
-        nodeId: n.id,
-        childrenCount: n.children_count,
-      }));
+    // Для каждого A-узла параллельно подгружаем количество удалённых веток
+    const restored: Message[] = await Promise.all(
+      branch
+        .filter(n => n.node_type === "user_message" || n.node_type === "assistant_message")
+        .map(async (n) => {
+          let deletedCount = 0;
+          if (n.node_type === "assistant_message") {
+            const deleted = await invoke<DbNode[]>("cmd_get_deleted_children", { nodeId: n.id });
+            deletedCount = deleted.length;
+          }
+          return {
+            role: n.node_type === "user_message" ? "user" : "assistant" as "user" | "assistant",
+            content: n.content,
+            nodeId: n.id,
+            childrenCount: n.children_count,
+            deletedChildrenCount: deletedCount,
+          };
+        })
+    );
 
     setMessages(restored);
 
@@ -206,6 +215,11 @@ function App() {
   // ---------------------------------------------------------------------------
 
   async function openForkMode(aNodeId: string) {
+    // Закрываем режим восстановления если был открыт
+    setDeletedMode(false);
+    setDeletedForkNodeId(null);
+    setDeletedForkCards([]);
+
     const children = await invoke<DbNode[]>("cmd_get_children", { nodeId: aNodeId });
     const aNode = await invoke<DbNode | null>("cmd_get_node", { nodeId: aNodeId });
 
@@ -235,7 +249,68 @@ function App() {
     setMenuNodeId(null);
   }
 
-  // Выбрать ветку в режиме развилки — атомарно на backend.
+  // ---------------------------------------------------------------------------
+  // Режим восстановления удалённых веток (D-050)
+  // ---------------------------------------------------------------------------
+
+  async function openDeletedMode(aNodeId: string) {
+    // Закрываем режим развилки если был открыт
+    await closeForkMode();
+
+    const deleted = await invoke<DbNode[]>("cmd_get_deleted_children", { nodeId: aNodeId });
+    const cards: BranchCard[] = deleted.map(c => ({
+      nodeId: c.id,
+      branchName: c.branch_name ?? c.content.slice(0, 80),
+      isActive: false,
+    }));
+
+    setDeletedForkCards(cards);
+    setDeletedForkNodeId(aNodeId);
+    setDeletedMode(true);
+  }
+
+  function closeDeletedMode() {
+    setDeletedMode(false);
+    setDeletedForkNodeId(null);
+    setDeletedForkCards([]);
+  }
+
+  async function restoreBranch(nodeId: string) {
+    if (!dialogId) return;
+    try {
+      await invoke("cmd_restore_branch", { nodeId });
+    } catch (e) {
+      console.error("restore_branch failed:", e);
+      return;
+    }
+    closeDeletedMode();
+    await loadBranch(dialogId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Удаление ветки из меню карточки (D-048, D-049)
+  // ---------------------------------------------------------------------------
+
+  async function deleteCardBranch(childId: string) {
+    if (!dialogId || !forkNodeId) return;
+    setMenuNodeId(null);
+    try {
+      await invoke("cmd_delete_branch", { dialogId, forkNodeId, childId });
+    } catch (e) {
+      // Сюда попадаем если пытаемся удалить последнюю видимую ветку —
+      // backend вернёт "cannot delete last visible branch"
+      console.error("delete_branch failed:", e);
+      return;
+    }
+    // Перезагружаем fork mode и ветку
+    await openForkMode(forkNodeId);
+    await loadBranch(dialogId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Выбор карточки
+  // ---------------------------------------------------------------------------
+
   async function selectForkCard(idx: number) {
     if (!dialogId || !forkNodeId) return;
     const card = forkCards[idx];
@@ -255,9 +330,10 @@ function App() {
     await loadBranch(dialogId);
   }
 
-  // --- Редактирование имени карточки ---
+  // ---------------------------------------------------------------------------
+  // Редактирование имени карточки
+  // ---------------------------------------------------------------------------
 
-  // Начать редактирование карточки idx
   function startEditing(nodeId: string) {
     const card = forkCards.find(c => c.nodeId === nodeId);
     if (!card) return;
@@ -271,11 +347,10 @@ function App() {
     setEditingText("");
   }
 
-  // Сохранить новое имя в БД и обновить карточку локально
   async function saveEditing() {
     if (!editingNodeId) return;
     const name = editingText.trim();
-    if (!name) { cancelEditing(); return; } // пустое имя не сохраняем
+    if (!name) { cancelEditing(); return; }
 
     try {
       await invoke("cmd_set_branch_name", { nodeId: editingNodeId, name });
@@ -288,9 +363,6 @@ function App() {
     cancelEditing();
   }
 
-  // Одиночный клик по карточке = выбрать ветку, но с задержкой,
-  // чтобы двойной клик (редактирование) не вызывал заодно выбор.
-  // Каждый новый клик отменяет предыдущий отложенный — выигрывает последний.
   function handleCardClick(idx: number) {
     if (clickTimer.current !== null) {
       clearTimeout(clickTimer.current);
@@ -309,9 +381,11 @@ function App() {
     startEditing(nodeId);
   }
 
-  // Ctrl+Up — идём вверх от нижнего края экрана.
-  // Находим самую глубокую развилку, начинающуюся выше нижнего края видимой области.
-  // Если развилок выше нет — просто прокручиваем беседу наверх.
+  // ---------------------------------------------------------------------------
+  // Навигация
+  // ---------------------------------------------------------------------------
+
+  // Ctrl+Up — ищем развилку с > 1 ВИДИМЫХ веток (D-049: удалённые не в счёт)
   function handleCtrlUp() {
     if (forkMode) return;
     const container = messagesRef.current;
@@ -322,23 +396,21 @@ function App() {
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m.role !== "assistant" || m.childrenCount <= 1) continue;
+      if (m.role !== "assistant") continue;
+      const visibleCount = m.childrenCount - m.deletedChildrenCount;
+      if (visibleCount <= 1) continue;
       const el = messageEls.current[i];
       if (!el) continue;
-      // позиция верха сообщения относительно видимого верха контейнера
       const relTop = el.getBoundingClientRect().top - containerTop;
-      // развилка начинается выше нижнего края экрана — берём её
       if (relTop < viewportHeight) {
         openForkMode(m.nodeId);
         return;
       }
     }
 
-    // развилок выше нет — прокручиваем к началу беседы
     container.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // Ctrl+Down — «провалиться» в выбранную ветку (D-045): подтвердить выбор.
   function handleCtrlDown() {
     if (forkMode) selectForkCard(forkActiveIdx);
   }
@@ -429,11 +501,15 @@ function App() {
       tokensCount: 0,
     });
 
-    const updatedMessages: Message[] = [
-      ...messages,
-      { role: "user", content: userText, nodeId: userNode.id, childrenCount: 0 },
-    ];
-    setMessages(updatedMessages);
+	const updatedMessages: Message[] = [
+	  ...messages.map(m =>
+		m.nodeId === parentId
+		  ? { ...m, childrenCount: m.childrenCount + 1 }
+		  : m
+	  ),
+	  { role: "user", content: userText, nodeId: userNode.id, childrenCount: 0, deletedChildrenCount: 0 },
+	];
+	setMessages(updatedMessages);
 
     try {
       const llmMessages: LlmMessage[] = updatedMessages.map(m => ({ role: m.role, content: m.content }));
@@ -451,7 +527,7 @@ function App() {
 
       setMessages([
         ...updatedMessages,
-        { role: "assistant", content: response, nodeId: assistantNode.id, childrenCount: 0 },
+        { role: "assistant", content: response, nodeId: assistantNode.id, childrenCount: 0, deletedChildrenCount: 0 },
       ]);
       setLastNodeId(assistantNode.id);
 
@@ -460,7 +536,7 @@ function App() {
     } catch (e) {
       setMessages([
         ...updatedMessages,
-        { role: "assistant", content: `Error: ${e}`, nodeId: "", childrenCount: 0 },
+        { role: "assistant", content: `Error: ${e}`, nodeId: "", childrenCount: 0, deletedChildrenCount: 0 },
       ]);
       setLastNodeId(userNode.id);
     }
@@ -495,6 +571,8 @@ function App() {
       </main>
     );
   }
+
+  const isBlocked = forkMode || deletedMode;
 
   return (
     <main className="container">
@@ -548,7 +626,6 @@ function App() {
                     <span className="fork-card-name">{card.branchName}</span>
                     {card.isActive && <span className="fork-card-badge">текущая</span>}
 
-                    {/* Кнопка контекстного меню — появляется при наведении */}
                     <button
                       className="fork-card-menu-btn"
                       title="Меню ветки"
@@ -560,11 +637,15 @@ function App() {
                       ⋮
                     </button>
 
-                    {/* Контекстное меню */}
                     {menuNodeId === card.nodeId && (
                       <div className="fork-card-menu" onClick={e => e.stopPropagation()}>
                         <button onClick={() => startEditing(card.nodeId)}>Редактировать</button>
-                        {/* Пункт "Удалить" — после реализации мягкого удаления ветви */}
+                        <button
+                          onClick={() => deleteCardBranch(card.nodeId)}
+                          style={{ color: "#c0392b" }}
+                        >
+                          Удалить ветку
+                        </button>
                       </div>
                     )}
                   </>
@@ -572,66 +653,101 @@ function App() {
               </div>
             ))}
           </div>
-          <div className="fork-hint">Ctrl+← → или мышь — выбор · Enter / Ctrl+↓ / клик — перейти · двойной клик / F2 — переименовать · ✕ — отмена</div>
+          <div className="fork-hint">Ctrl+← → или мышь · Enter / Ctrl+↓ / клик — перейти · F2 / двойной клик — переименовать</div>
+        </div>
+      )}
+
+      {/* Режим восстановления удалённых веток (D-050) */}
+      {deletedMode && (
+        <div className="deleted-overlay">
+          <div className="fork-header">
+            <span className="deleted-title">Удалённые ветки</span>
+            <button className="fork-close-btn" onClick={closeDeletedMode}>✕</button>
+          </div>
+          <div className="fork-cards">
+            {deletedForkCards.map(card => (
+              <div key={card.nodeId} className="deleted-card">
+                <span className="deleted-card-name">{card.branchName}</span>
+                <button
+                  className="restore-btn"
+                  onClick={() => restoreBranch(card.nodeId)}
+                >
+                  Восстановить
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* Сообщения */}
       <div className="messages" ref={messagesRef}>
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`message ${m.role}`}
-            ref={el => { messageEls.current[i] = el; }}
-          >
-            <div className="message-content">
-              <p>{m.content}</p>
+        {messages.map((m, i) => {
+          const visibleCount = m.childrenCount - m.deletedChildrenCount;
+          return (
+            <div
+              key={i}
+              className={`message ${m.role}`}
+              ref={el => { messageEls.current[i] = el; }}
+            >
+              <div className="message-content">
+                <p>{m.content}</p>
+              </div>
+
+              {m.role === "assistant" && (
+				<div className="message-actions">
+					{visibleCount > 1 && (
+					  <button
+						className="fork-btn"
+						title={`Развилка (${visibleCount} ветки)`}
+						onClick={() => openForkMode(m.nodeId)}
+					  >
+						⑂
+					  </button>
+					)}
+
+					{m.deletedChildrenCount > 0 && (
+					  <button
+						className="fork-btn--deleted"
+						title={`Удалённые ветки: ${m.deletedChildrenCount}`}
+						onClick={() => openDeletedMode(m.nodeId)}
+					  >
+						⑂{m.deletedChildrenCount > 1 ? ` ×${m.deletedChildrenCount}` : ""}
+					  </button>
+					)}
+
+					{m.childrenCount > 0 && (
+					  <button
+						className="branch-btn"
+						title="Создать ветку"
+						onClick={() => {
+						  setBranchingFromId(branchingFromId === m.nodeId ? null : m.nodeId);
+						  setBranchInput("");
+						}}
+					  >
+						+
+					  </button>
+					)}
+				  </div>
+				)}
+
+              {branchingFromId === m.nodeId && (
+                <div className="branch-input-row">
+                  <input
+                    autoFocus
+                    value={branchInput}
+                    onChange={e => setBranchInput(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && sendBranch()}
+                    placeholder="Альтернативный вопрос..."
+                    disabled={loading}
+                  />
+                  <button onClick={sendBranch} disabled={loading}>→</button>
+                  <button onClick={() => setBranchingFromId(null)}>✕</button>
+                </div>
+              )}
             </div>
-
-            {/* Панель действий — только для A-узлов */}
-            {m.role === "assistant" && (
-              <div className="message-actions">
-                {/* Иконка дерева — только если есть ветки */}
-                {m.childrenCount > 1 && (
-                  <button
-                    className="fork-btn"
-                    title={`Развилка (${m.childrenCount} ветки)`}
-                    onClick={() => openForkMode(m.nodeId)}
-                  >
-                    ⑂
-                  </button>
-                )}
-                {/* Кнопка новой ветки */}
-                <button
-                  className="branch-btn"
-                  title="Создать ветку"
-                  onClick={() => {
-                    setBranchingFromId(branchingFromId === m.nodeId ? null : m.nodeId);
-                    setBranchInput("");
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            )}
-
-            {/* Поле ввода альтернативного вопроса */}
-            {branchingFromId === m.nodeId && (
-              <div className="branch-input-row">
-                <input
-                  autoFocus
-                  value={branchInput}
-                  onChange={e => setBranchInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && sendBranch()}
-                  placeholder="Альтернативный вопрос..."
-                  disabled={loading}
-                />
-                <button onClick={sendBranch} disabled={loading}>→</button>
-                <button onClick={() => setBranchingFromId(null)}>✕</button>
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
         {loading && <p className="loading">Думаю...</p>}
       </div>
 
@@ -642,9 +758,9 @@ function App() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && sendMessage()}
           placeholder="Введите сообщение..."
-          disabled={loading || !dialogId || forkMode}
+          disabled={loading || !dialogId || isBlocked}
         />
-        <button onClick={sendMessage} disabled={loading || !dialogId || forkMode}>
+        <button onClick={sendMessage} disabled={loading || !dialogId || isBlocked}>
           Отправить
         </button>
       </div>
