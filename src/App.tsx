@@ -15,8 +15,16 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   nodeId: string;
+  nodeType: string;             // user_message | assistant_message | unanswered_placeholder
   childrenCount: number;         // total, включая удалённые
   deletedChildrenCount: number;  // только удалённые (D-050)
+  markers: MarkerData[];         // маркеры на этом узле (D-058)
+}
+interface MarkerData {
+  id: string;
+  nodeId: string;
+  label: string;
+  comment: string | null;
 }
 
 interface DbDialog {
@@ -44,15 +52,53 @@ interface DepthIndicators {
   branches_right: number;
 }
 
-interface BranchResult {
-  new_node_id: string;
-  dialog_id: string;
+interface SendResult {
+  query_id: string;
+  placeholder_id: string;
 }
 
 interface BranchCard {
   nodeId: string;
   branchName: string;
   isActive: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Сборка цепочки для LLM
+// ---------------------------------------------------------------------------
+
+// Превращает линейную ветку узлов в сообщения для LLM.
+// Правило: unanswered_placeholder — служебная заглушка-ответ.
+//   - заглушка В СЕРЕДИНЕ ветки = холостой Q из прошлого сбоя: срезаем
+//     и её, и Q над ней (для модели этой пары не было).
+//   - заглушка НА КОНЦЕ ветки = текущий ожидающий запрос: её Q обязан уйти
+//     в LLM (на него и ждём ответ), пропускаем только саму пустую заглушку.
+function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
+  const out: LlmMessage[] = [];
+  const lastIdx = nodes.length - 1;
+
+  nodes.forEach((n, idx) => {
+    if (n.node_type === "unanswered_placeholder") {
+      if (idx === lastIdx) {
+        // Текущий запрос: Q уже добавлен предыдущей итерацией, его оставляем.
+        // Саму заглушку (пустую) в модель не шлём.
+        return;
+      }
+      // Холостой Q из прошлого: срезаем заглушку и Q над ней.
+      if (out.length > 0 && out[out.length - 1].role === "user") {
+        out.pop();
+      }
+      return;
+    }
+    if (n.node_type === "user_message") {
+      out.push({ role: "user", content: n.content });
+    } else if (n.node_type === "assistant_message") {
+      out.push({ role: "assistant", content: n.content });
+    }
+    // прочие служебные типы — в LLM не идут
+  });
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +116,15 @@ function App() {
   // Ветвление
   const [branchingFromId, setBranchingFromId] = useState<string | null>(null);
   const [branchInput, setBranchInput] = useState("");
-
+  
+  // Маркеры (D-058) — раскрытое поле комментария при постановке
+  const [markingNodeId, setMarkingNodeId] = useState<string | null>(null);
+  const [markerComment, setMarkerComment] = useState("");
+  
+  // Маркеры — редактирование комментария существующего маркера
+  const [editingMarkerId, setEditingMarkerId] = useState<string | null>(null);
+  const [editingMarkerText, setEditingMarkerText] = useState("");
+  
   // Режим развилки
   const [forkMode, setForkMode] = useState(false);
   const [forkNodeId, setForkNodeId] = useState<string | null>(null);
@@ -180,24 +234,45 @@ function App() {
   async function loadBranch(dId: string) {
     const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId: dId });
 
-    // Для каждого A-узла параллельно подгружаем количество удалённых веток
+    // Узлы для ПОКАЗА: реплики + холостые заглушки (рисуем серой плашкой).
+    // Прочие служебные типы (system, context_migration, compression_*) в ленту
+    // не идут. Заглушка показывается, но как "ответ не получен".
+    const visible = branch.filter(
+      n =>
+        n.node_type === "user_message" ||
+        n.node_type === "assistant_message" ||
+        n.node_type === "unanswered_placeholder"
+    );
+
     const restored: Message[] = await Promise.all(
-      branch
-        .filter(n => n.node_type === "user_message" || n.node_type === "assistant_message")
-        .map(async (n) => {
-          let deletedCount = 0;
-          if (n.node_type === "assistant_message") {
-            const deleted = await invoke<DbNode[]>("cmd_get_deleted_children", { nodeId: n.id });
-            deletedCount = deleted.length;
-          }
-          return {
-            role: n.node_type === "user_message" ? "user" : "assistant" as "user" | "assistant",
-            content: n.content,
-            nodeId: n.id,
-            childrenCount: n.children_count,
-            deletedChildrenCount: deletedCount,
-          };
-        })
+      visible.map(async (n) => {
+        let deletedCount = 0;
+        let markers: MarkerData[] = [];
+        // Удалённые ветки и маркеры считаем только под реальными ответами
+        // (маркер только на A-узле, D-058; под заглушкой веток нет — она лист).
+        if (n.node_type === "assistant_message") {
+          const deleted = await invoke<DbNode[]>("cmd_get_deleted_children", { nodeId: n.id });
+          deletedCount = deleted.length;
+
+          const rawMarkers = await invoke<any[]>("cmd_get_markers_for_node", { nodeId: n.id });
+          markers = rawMarkers.map(m => ({
+            id: m.id,
+            nodeId: m.node_id,
+            label: m.label,
+            comment: m.comment,
+          }));
+        }
+        return {
+          role: n.node_type === "user_message" ? "user" : "assistant" as "user" | "assistant",
+          content: n.content,
+          nodeId: n.id,
+          nodeType: n.node_type,
+          childrenCount: n.children_count,
+          deletedChildrenCount: deletedCount,
+          markers,
+        };
+		
+      })
     );
 
     setMessages(restored);
@@ -442,32 +517,104 @@ function App() {
     setLoading(false);
   }
 
+// ---------------------------------------------------------------------------
+  // Маркеры (D-058)
+  // ---------------------------------------------------------------------------
+
+  // Следующий номер #N: max существующих по диалогу + 1.
+  // Дырки от удаления НЕ переиспользуются — номера монотонно растут.
+  function nextMarkerLabel(): string {
+    let maxN = 0;
+    for (const m of messages) {
+      for (const mk of m.markers) {
+        const match = mk.label.match(/^#(\d+)$/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n > maxN) maxN = n;
+        }
+      }
+    }
+    return `#${maxN + 1}`;
+  }
+
+  async function createMarker(nodeId: string) {
+    if (!dialogId) return;
+    const label = nextMarkerLabel();
+    const comment = markerComment.trim() || null;
+    try {
+      await invoke("cmd_create_marker", { nodeId, label, comment });
+    } catch (e) {
+      console.error("create_marker failed:", e);
+      return;
+    }
+    setMarkingNodeId(null);
+    setMarkerComment("");
+    await loadBranch(dialogId);
+  }
+
+  async function deleteMarker(markerId: string) {
+    if (!dialogId) return;
+    try {
+      await invoke("cmd_delete_marker", { markerId });
+    } catch (e) {
+      // D-067: бэкенд не даст удалить, если на узел ссылается сжатие.
+      console.error("delete_marker failed:", e);
+      return;
+    }
+    await loadBranch(dialogId);
+  }
+  
+  function startEditingMarker(markerId: string, currentComment: string | null) {
+    setEditingMarkerId(markerId);
+    setEditingMarkerText(currentComment ?? "");
+  }
+
+  function cancelEditingMarker() {
+    setEditingMarkerId(null);
+    setEditingMarkerText("");
+  }
+
+  async function saveMarkerComment(markerId: string, label: string) {
+    if (!dialogId) return;
+    const comment = editingMarkerText.trim() || null;
+    try {
+      // cmd_update_marker обновляет и label, и comment — label передаём
+      // неизменным (#N не меняется, D: имя не правим).
+      await invoke("cmd_update_marker", { markerId, label, comment });
+    } catch (e) {
+      console.error("update_marker failed:", e);
+      return;
+    }
+    cancelEditingMarker();
+    await loadBranch(dialogId);
+  }
+
   async function sendBranch() {
     if (!branchInput.trim() || loading || !dialogId || !branchingFromId) return;
     const userText = branchInput.trim();
+    const parentId = branchingFromId;
     setBranchInput("");
     setBranchingFromId(null);
     setLoading(true);
 
-    const result = await invoke<BranchResult>("cmd_branch_from_node", {
-      dialogId,
-      parentId: branchingFromId,
-      content: userText,
-    });
-
-    await loadBranch(dialogId);
-
-    const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId });
-    const llmMessages: LlmMessage[] = branch
-      .filter(n => n.node_type === "user_message" || n.node_type === "assistant_message")
-      .map(n => ({ role: n.node_type === "user_message" ? "user" : "assistant", content: n.content }));
-
+    // Ветка идёт через тот же устойчивый поток: Q + заглушка создаются разом,
+    // ответ перезаписывает заглушку. parentId — точка ветвления (A-узел).
     try {
-      const response = await invoke<string>("send_message", { messages: llmMessages, modelId: MODEL });
-      await invoke<DbNode>("cmd_create_node", {
+      const sent = await invoke<SendResult>("cmd_send_user_message", {
         dialogId,
-        parentId: result.new_node_id,
-        nodeType: "assistant_message",
+        parentId,
+        content: userText,
+      });
+
+      // Показываем новое состояние сразу (Q + плашка), как при обычной отправке.
+      await loadBranch(dialogId);
+
+      const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId });
+      const llmMessages = buildLlmMessages(branch);
+      const response = await invoke<string>("send_message", { messages: llmMessages, modelId: MODEL });
+
+      await invoke<DbNode>("cmd_resolve_answer", {
+        placeholderId: sent.placeholder_id,
         content: response,
         modelId: MODEL,
         modelRole: "main_dialog",
@@ -475,15 +622,9 @@ function App() {
       });
       await loadBranch(dialogId);
     } catch (e) {
-      await invoke<DbNode>("cmd_create_node", {
-        dialogId,
-        parentId: result.new_node_id,
-        nodeType: "assistant_message",
-        content: `Error: ${e}`,
-        modelId: null,
-        modelRole: null,
-        tokensCount: 0,
-      });
+      // Ответ не получен — заглушка остаётся в дереве, в ленте покажется
+      // серой плашкой "ответ не получен". Просто перечитываем ветку.
+      console.error("sendBranch failed:", e);
       await loadBranch(dialogId);
     } finally {
       setLoading(false);
@@ -491,54 +632,43 @@ function App() {
   }
 
   async function doSend(dId: string, parentId: string | null, userText: string) {
-    const userNode = await invoke<DbNode>("cmd_create_node", {
-      dialogId: dId,
-      parentId,
-      nodeType: "user_message",
-      content: userText,
-      modelId: null,
-      modelRole: null,
-      tokensCount: 0,
-    });
+    // Устойчивый поток (D-0xx): Q + unanswered_placeholder создаются атомарно
+    // ДО обращения к LLM. Если приложение упадёт / ответ не придёт — структура
+    // уже регулярна, холостой Q закрыт заглушкой.
+    let sent: SendResult;
+    try {
+      sent = await invoke<SendResult>("cmd_send_user_message", {
+        dialogId: dId,
+        parentId,
+        content: userText,
+      });
+    } catch (e) {
+      console.error("send_user_message failed:", e);
+      return;
+    }
 
-	const updatedMessages: Message[] = [
-	  ...messages.map(m =>
-		m.nodeId === parentId
-		  ? { ...m, childrenCount: m.childrenCount + 1 }
-		  : m
-	  ),
-	  { role: "user", content: userText, nodeId: userNode.id, childrenCount: 0, deletedChildrenCount: 0 },
-	];
-	setMessages(updatedMessages);
+    // Показываем Q + плашку сразу.
+    await loadBranch(dId);
 
     try {
-      const llmMessages: LlmMessage[] = updatedMessages.map(m => ({ role: m.role, content: m.content }));
+      const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId: dId });
+      const llmMessages = buildLlmMessages(branch);
       const response = await invoke<string>("send_message", { messages: llmMessages, modelId: MODEL });
 
-      const assistantNode = await invoke<DbNode>("cmd_create_node", {
-        dialogId: dId,
-        parentId: userNode.id,
-        nodeType: "assistant_message",
+      await invoke<DbNode>("cmd_resolve_answer", {
+        placeholderId: sent.placeholder_id,
         content: response,
         modelId: MODEL,
         modelRole: "main_dialog",
         tokensCount: 0,
       });
 
-      setMessages([
-        ...updatedMessages,
-        { role: "assistant", content: response, nodeId: assistantNode.id, childrenCount: 0, deletedChildrenCount: 0 },
-      ]);
-      setLastNodeId(assistantNode.id);
-
-      const indicators = await invoke<DepthIndicators>("cmd_get_depth_indicators", { dialogId: dId });
-      setDepth(indicators);
+      await loadBranch(dId);
     } catch (e) {
-      setMessages([
-        ...updatedMessages,
-        { role: "assistant", content: `Error: ${e}`, nodeId: "", childrenCount: 0, deletedChildrenCount: 0 },
-      ]);
-      setLastNodeId(userNode.id);
+      // LLM не ответил: заглушка остаётся unanswered_placeholder.
+      // В ленте — серая плашка "ответ не получен". Ничего не перезаписываем.
+      console.error("resolve_answer/send_message failed:", e);
+      await loadBranch(dId);
     }
   }
 
@@ -684,6 +814,22 @@ function App() {
       <div className="messages" ref={messagesRef}>
         {messages.map((m, i) => {
           const visibleCount = m.childrenCount - m.deletedChildrenCount;
+
+          // Холостая заглушка: ответ не пришёл — серая некликабельная плашка.
+          if (m.nodeType === "unanswered_placeholder") {
+            return (
+              <div
+                key={i}
+                className="message assistant message--unanswered"
+                ref={el => { messageEls.current[i] = el; }}
+              >
+                <div className="message-content message-content--unanswered">
+                  <p className="unanswered-note">Ответ не получен</p>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={i}
@@ -695,41 +841,113 @@ function App() {
               </div>
 
               {m.role === "assistant" && (
-				<div className="message-actions">
-					{visibleCount > 1 && (
-					  <button
-						className="fork-btn"
-						title={`Развилка (${visibleCount} ветки)`}
-						onClick={() => openForkMode(m.nodeId)}
-					  >
-						⑂
-					  </button>
-					)}
+                <div className="message-actions">
+                  {visibleCount > 1 && (
+                    <button
+                      className="fork-btn"
+                      title={`Развилка (${visibleCount} ветки)`}
+                      onClick={() => openForkMode(m.nodeId)}
+                    >
+                      ⑂
+                    </button>
+                  )}
 
-					{m.deletedChildrenCount > 0 && (
-					  <button
-						className="fork-btn--deleted"
-						title={`Удалённые ветки: ${m.deletedChildrenCount}`}
-						onClick={() => openDeletedMode(m.nodeId)}
-					  >
-						⑂{m.deletedChildrenCount > 1 ? ` ×${m.deletedChildrenCount}` : ""}
-					  </button>
-					)}
+                  {m.deletedChildrenCount > 0 && (
+                    <button
+                      className="fork-btn--deleted"
+                      title={`Удалённые ветки: ${m.deletedChildrenCount}`}
+                      onClick={() => openDeletedMode(m.nodeId)}
+                    >
+                      ⑂{m.deletedChildrenCount > 1 ? ` ×${m.deletedChildrenCount}` : ""}
+                    </button>
+                  )}
 
-					{m.childrenCount > 0 && (
-					  <button
-						className="branch-btn"
-						title="Создать ветку"
-						onClick={() => {
-						  setBranchingFromId(branchingFromId === m.nodeId ? null : m.nodeId);
-						  setBranchInput("");
-						}}
-					  >
-						+
-					  </button>
-					)}
-				  </div>
-				)}
+                  {m.childrenCount > 0 && (
+                    <button
+                      className="branch-btn"
+                      title="Создать ветку"
+                      onClick={() => {
+                        setBranchingFromId(branchingFromId === m.nodeId ? null : m.nodeId);
+                        setBranchInput("");
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
+
+                  {m.markers.length === 0 ? (
+                    <button
+                      className="marker-btn"
+                      title="Поставить маркер"
+                      onClick={() => {
+                        setMarkingNodeId(markingNodeId === m.nodeId ? null : m.nodeId);
+                        setMarkerComment("");
+                      }}
+                    >
+                      ⚑
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        className="marker-btn marker-btn--active"
+                        title={`Снять маркер ${m.markers[0].label}`}
+                        onClick={() => deleteMarker(m.markers[0].id)}
+                      >
+                        ⚑ {m.markers[0].label}
+                      </button>
+
+                      {editingMarkerId === m.markers[0].id ? (
+                        <textarea
+                          className="marker-comment-edit"
+                          autoFocus
+                          value={editingMarkerText}
+                          onChange={e => setEditingMarkerText(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              saveMarkerComment(m.markers[0].id, m.markers[0].label);
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelEditingMarker();
+                            }
+                          }}
+                          rows={1}
+                        />
+                      ) : (
+                        m.markers[0].comment && (
+                          <span
+                            className="marker-comment"
+                            title="Двойной клик — редактировать"
+                            onDoubleClick={() =>
+                              startEditingMarker(m.markers[0].id, m.markers[0].comment)
+                            }
+                          >
+                            {m.markers[0].comment}
+                          </span>
+                        )
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {markingNodeId === m.nodeId && m.markers.length === 0 && (
+                <div className="marker-input-row">
+                  <span className="marker-label-preview">{nextMarkerLabel()}</span>
+                  <input
+                    autoFocus
+                    value={markerComment}
+                    onChange={e => setMarkerComment(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { e.preventDefault(); createMarker(m.nodeId); }
+                      else if (e.key === "Escape") { e.preventDefault(); setMarkingNodeId(null); }
+                    }}
+                    placeholder="Комментарий (необязательно)..."
+                  />
+                  <button onClick={() => createMarker(m.nodeId)}>✓</button>
+                  <button onClick={() => setMarkingNodeId(null)}>✕</button>
+                </div>
+              )}
 
               {branchingFromId === m.nodeId && (
                 <div className="branch-input-row">

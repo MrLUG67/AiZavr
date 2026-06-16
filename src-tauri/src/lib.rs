@@ -4,6 +4,7 @@ mod db;
 mod llm;
 mod tree;
 mod keychain;
+mod markers;
 
 use db::{DbDialog, DbNode};
 use llm::{Message, openrouter::OpenRouterProvider, LlmProvider};
@@ -244,6 +245,135 @@ async fn cmd_get_depth_indicators(
     tree::get_depth_indicators(&state.db, &dialog_id).await
 }
 
+/// Отправка пользовательского сообщения (устойчивый поток).
+/// Создаёт Q + unanswered_placeholder атомарно. Реальный ответ затем
+/// приходит через cmd_resolve_answer(placeholder_id, ...).
+#[tauri::command]
+async fn cmd_send_user_message(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    parent_id: Option<String>,
+    content: String,
+) -> Result<db::SendResult, String> {
+    db::send_user_message(&state.db, &dialog_id, parent_id.as_deref(), &content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Перезаписать заглушку реальным ответом LLM
+/// (unanswered_placeholder → assistant_message).
+#[tauri::command]
+async fn cmd_resolve_answer(
+    state: tauri::State<'_, AppState>,
+    placeholder_id: String,
+    content: String,
+    model_id: Option<String>,
+    model_role: Option<String>,
+    tokens_count: i64,
+) -> Result<DbNode, String> {
+    db::resolve_answer(
+        &state.db,
+        &placeholder_id,
+        &content,
+        model_id.as_deref(),
+        model_role.as_deref(),
+        tokens_count,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Маркеры (D-058) — CRUD
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_create_marker(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+    label: String,
+    comment: Option<String>,
+) -> Result<markers::Marker, String> {
+    markers::create_marker(&state.db, &node_id, &label, comment.as_deref()).await
+}
+
+#[tauri::command]
+async fn cmd_get_markers_for_node(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<Vec<markers::Marker>, String> {
+    markers::get_markers_for_node(&state.db, &node_id).await
+}
+
+#[tauri::command]
+async fn cmd_list_markers_for_dialog(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Vec<markers::Marker>, String> {
+    markers::list_markers_for_dialog(&state.db, &dialog_id).await
+}
+
+#[tauri::command]
+async fn cmd_update_marker(
+    state: tauri::State<'_, AppState>,
+    marker_id: String,
+    label: String,
+    comment: Option<String>,
+) -> Result<(), String> {
+    markers::update_marker(&state.db, &marker_id, &label, comment.as_deref()).await
+}
+
+/// Удалить маркер. Запрещено при наличии ссылки от сжатия (D-067).
+#[tauri::command]
+async fn cmd_delete_marker(
+    state: tauri::State<'_, AppState>,
+    marker_id: String,
+) -> Result<(), String> {
+    markers::delete_marker(&state.db, &marker_id).await
+}
+
+/// Заблокирован ли узел маркера ссылкой от сжатия (D-067).
+/// true ⟺ удаление маркера на этом узле запрещено. Для UX «кнопка задизейблена
+/// + тултип» (как D-049), чтобы не получать ошибку постфактум. В MVP всегда
+/// false (S-узлов ещё нет) — но хук правильный.
+#[tauri::command]
+async fn cmd_is_node_referenced_by_compression(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<bool, String> {
+    markers::is_node_referenced_by_compression(&state.db, &node_id).await
+}
+
+// ---------------------------------------------------------------------------
+// Маркеры — топология (D-066)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_list_startable_markers(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Vec<markers::Marker>, String> {
+    markers::list_startable_markers(&state.db, &dialog_id).await
+}
+
+#[tauri::command]
+async fn cmd_list_reachable_ends(
+    state: tauri::State<'_, AppState>,
+    from_node_id: String,
+) -> Result<Vec<markers::ReachableEnd>, String> {
+    markers::list_reachable_ends(&state.db, &from_node_id).await
+}
+
+/// Линеаризовать диапазон start..end (D-066). Инклюзивный путь, start первым.
+#[tauri::command]
+async fn cmd_resolve_linear_range(
+    state: tauri::State<'_, AppState>,
+    start_node_id: String,
+    end_node_id: String,
+) -> Result<Vec<DbNode>, String> {
+    markers::resolve_linear_range(&state.db, &start_node_id, &end_node_id).await
+}
+
 // ---------------------------------------------------------------------------
 // Keychain
 // ---------------------------------------------------------------------------
@@ -303,14 +433,25 @@ pub fn run() {
             cmd_set_active_child,
             cmd_set_branch_name,
             cmd_set_last_visited_leaf,
-            cmd_set_api_key,
-            cmd_get_api_key,
-            cmd_delete_api_key,
             cmd_branch_from_node,
             cmd_select_branch,
             cmd_delete_branch,
             cmd_restore_branch,
             cmd_get_depth_indicators,
+            cmd_send_user_message,
+            cmd_resolve_answer,
+            cmd_create_marker,
+            cmd_get_markers_for_node,
+            cmd_list_markers_for_dialog,
+            cmd_update_marker,
+            cmd_delete_marker,
+            cmd_is_node_referenced_by_compression,
+            cmd_list_startable_markers,
+            cmd_list_reachable_ends,
+            cmd_resolve_linear_range,
+            cmd_set_api_key,
+            cmd_get_api_key,
+            cmd_delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");

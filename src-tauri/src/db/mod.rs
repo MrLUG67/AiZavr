@@ -47,7 +47,7 @@ pub struct DbNode {
     pub id: String,
     pub parent_id: Option<String>,
     pub dialog_id: String,
-    pub node_type: String,               // user_message | assistant_message | system | ...
+    pub node_type: String,               // user_message | assistant_message | unanswered_placeholder | ...
     pub content: String,
     pub active_child_id: Option<String>,
     pub model_id: Option<String>,
@@ -65,6 +65,15 @@ pub struct DbNode {
     pub children_count: i64,             // полный счётчик, включая удалённые
     // --- добавлено миграцией 004 ---
     pub is_deleted: bool,                // D-048: мягкое удаление
+}
+
+/// Результат отправки пользовательского сообщения.
+/// query_id — созданный Q-узел; placeholder_id — заглушка-ответ под ним,
+/// которую затем перезапишет resolve_answer при получении ответа LLM.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SendResult {
+    pub query_id: String,
+    pub placeholder_id: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +238,103 @@ pub async fn create_node(
 
     update_dialog_leaf(pool, dialog_id, id).await?;
     get_node(pool, id).await?.ok_or(sqlx::Error::RowNotFound)
+}
+
+/// Отправка пользовательского сообщения: атомарно создаёт Q-узел и
+/// под ним служебную заглушку-ответ (unanswered_placeholder).
+///
+/// Заглушка ставится ВСЕГДА, до обращения к LLM — это устойчивость к сбоям:
+/// если приложение упадёт / пользователь уйдёт до ответа, структура уже
+/// регулярна (Q→A), холостого Q без ответа не возникает.
+///
+/// При успешном ответе вызывающий код зовёт resolve_answer(placeholder_id, ...).
+/// content заглушки пустой: она опознаётся по node_type, не по тексту (ср. D-061).
+pub async fn send_user_message(
+    pool: &SqlitePool,
+    dialog_id: &str,
+    parent_id: Option<&str>,
+    content: &str,
+) -> Result<SendResult, sqlx::Error> {
+    // 1. Q-узел обычным путём (active_child у родителя, children_count,
+    //    root_node_id при необходимости, курсор диалога → Q).
+    let query_id = uuid::Uuid::new_v4().to_string();
+    create_node(
+        pool,
+        &query_id,
+        dialog_id,
+        parent_id,
+        "user_message",
+        content,
+        None,
+        None,
+        0,
+    )
+    .await?;
+
+    // 2. Заглушка-ответ под Q. create_node сдвинет курсор диалога на неё
+    //    и проставит active_child у Q.
+    let placeholder_id = uuid::Uuid::new_v4().to_string();
+    create_node(
+        pool,
+        &placeholder_id,
+        dialog_id,
+        Some(&query_id),
+        "unanswered_placeholder",
+        "",
+        None,
+        None,
+        0,
+    )
+    .await?;
+
+    Ok(SendResult { query_id, placeholder_id })
+}
+
+/// Перезаписать заглушку реальным ответом LLM.
+/// unanswered_placeholder → assistant_message (UPDATE, не INSERT): id узла и
+/// его место в дереве сохраняются.
+///
+/// Проверяет, что узел всё ещё заглушка — защита от двойной доставки/гонок.
+/// Если узел уже не unanswered_placeholder — ошибка, узел не трогается.
+pub async fn resolve_answer(
+    pool: &SqlitePool,
+    placeholder_id: &str,
+    content: &str,
+    model_id: Option<&str>,
+    model_role: Option<&str>,
+    tokens_count: i64,
+) -> Result<DbNode, sqlx::Error> {
+    let node = get_node(pool, placeholder_id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
+
+    if node.node_type != "unanswered_placeholder" {
+        return Err(sqlx::Error::Protocol(format!(
+            "resolve_answer: node {} is '{}', not an unanswered_placeholder",
+            placeholder_id, node.node_type
+        )));
+    }
+
+    sqlx::query(
+        "UPDATE nodes
+         SET node_type = 'assistant_message',
+             content = ?,
+             model_id = ?,
+             model_role = ?,
+             tokens_count = ?
+         WHERE id = ?"
+    )
+    .bind(content)
+    .bind(model_id)
+    .bind(model_role)
+    .bind(tokens_count)
+    .bind(placeholder_id)
+    .execute(pool)
+    .await?;
+
+    get_node(pool, placeholder_id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
 }
 
 pub async fn get_node(

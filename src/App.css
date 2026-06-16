@@ -307,6 +307,7 @@ h1 {
 /* Панель действий под A-узлом */
 .message-actions {
   display: flex;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 4px;
   padding-left: 2px;
@@ -554,4 +555,94 @@ h1 {
     border-color: rgba(255,255,255,0.15);
     background-color: rgba(255,255,255,0.03);
   }
+}
+
+/* --- Маркеры (D-058) --- */
+
+.marker-btn {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #666;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.marker-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.marker-btn--active {
+  background: #fde8c0;
+  border-color: #e0a92e;
+  color: #8a5a00;
+  font-weight: 600;
+}
+
+.marker-btn--active:hover {
+  background: #fbdca0;
+}
+
+.marker-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.marker-label-preview {
+  font-weight: 600;
+  color: #8a5a00;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.marker-input-row input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.marker-input-row button {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.marker-input-row button:hover {
+  background: #f0f0f0;
+}
+
+.marker-comment {
+  display: inline-block;
+  max-width: 320px;
+  margin-left: 6px;
+  padding: 2px 6px;
+  font-size: 0.85rem;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  cursor: text;
+}
+
+.marker-comment-edit {
+  margin-left: 6px;
+  min-width: 240px;
+  min-height: 2em;
+  padding: 4px 8px;
+  border: 1px solid #e0a92e;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+  vertical-align: middle;
 }
