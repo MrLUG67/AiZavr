@@ -1,0 +1,1657 @@
+‘âàãªâãà  ¯ ¯®ª â®¬  Expansion
+‘¥à¨©­ë© ­®¬¥à â®¬ : 5E9F-659D
+E:.
+ÃÄÄÄsrc-tauri
+³   ÃÄÄÄcapabilities
+³   ÃÄÄÄicons
+³   ÃÄÄÄsrc
+³   ³   ÃÄÄÄdb
+³   ³   ÃÄÄÄllm
+³   ³   ÃÄÄÄtree
+³   ³   ÃÄÄÄkeychain
+³   ³   ÀÄÄÄmarkers
+³   ÃÄÄÄtarget
+³   ³   ÃÄÄÄdebug
+³   ³   ³   ÃÄÄÄexamples
+³   ³   ³   ÃÄÄÄdeps
+³   ³   ³   ÃÄÄÄ.fingerprint
+³   ³   ³   ³   ÃÄÄÄaizavr-0a65561e19e426fd
+³   ³   ³   ³   ÃÄÄÄaizavr-b360fe00ebd6cdf2
+³   ³   ³   ³   ÃÄÄÄaizavr-fde0cce61911810c
+³   ³   ³   ³   ÃÄÄÄtauri-build-f3b19ab7ac471aa7
+³   ³   ³   ³   ÃÄÄÄanyhow-c6babb0c09bad520
+³   ³   ³   ³   ÃÄÄÄanyhow-7292878aaa05da4c
+³   ³   ³   ³   ÃÄÄÄanyhow-854be13ee807ceeb
+³   ³   ³   ³   ÃÄÄÄcargo_toml-660affabc70626b0
+³   ³   ³   ³   ÃÄÄÄserde-1632d5f9704053d5
+³   ³   ³   ³   ÃÄÄÄserde-69dadcdd184ecf30
+³   ³   ³   ³   ÃÄÄÄserde-cdb2584a7192e2fc
+³   ³   ³   ³   ÃÄÄÄserde_core-a135f920db68de26
+³   ³   ³   ³   ÃÄÄÄserde_core-2edbf5ce1d61934b
+³   ³   ³   ³   ÃÄÄÄserde_core-73d152b7ceda14db
+³   ³   ³   ³   ÃÄÄÄserde_derive-895d56c487d9cfab
+³   ³   ³   ³   ÃÄÄÄproc-macro2-01ac8537dae2b402
+³   ³   ³   ³   ÃÄÄÄproc-macro2-0089b8fc4861aeb0
+³   ³   ³   ³   ÃÄÄÄproc-macro2-f101e74d49154d97
+³   ³   ³   ³   ÃÄÄÄunicode-ident-c2fe9f6b8ade098b
+³   ³   ³   ³   ÃÄÄÄquote-e600caeee2b20115
+³   ³   ³   ³   ÃÄÄÄquote-ff2a90532af845aa
+³   ³   ³   ³   ÃÄÄÄquote-78c7521c3e232bbe
+³   ³   ³   ³   ÃÄÄÄsyn-b4e521442ece14ed
+³   ³   ³   ³   ÃÄÄÄtoml-6e94eb2ddc29062f
+³   ³   ³   ³   ÃÄÄÄserde_spanned-277264f2ad43cefe
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-01d1a278afe44aef
+³   ³   ³   ³   ÃÄÄÄtoml_parser-439945e812265b03
+³   ³   ³   ³   ÃÄÄÄwinnow-aadb9e51292de79e
+³   ³   ³   ³   ÃÄÄÄtoml_writer-851e0dd56e677921
+³   ³   ³   ³   ÃÄÄÄwinnow-f83060dd4a555a13
+³   ³   ³   ³   ÃÄÄÄdirs-a803eb5afcbf7a95
+³   ³   ³   ³   ÃÄÄÄdirs-sys-d145f118bba8d7fa
+³   ³   ³   ³   ÃÄÄÄoption-ext-d34cdf2551cb6085
+³   ³   ³   ³   ÃÄÄÄwindows-sys-7d0a8a45f9dd8be8
+³   ³   ³   ³   ÃÄÄÄwindows-link-d2ef63ecef51002c
+³   ³   ³   ³   ÃÄÄÄglob-2e2cf4d75ff2d305
+³   ³   ³   ³   ÃÄÄÄheck-530ae96cd4e922bb
+³   ³   ³   ³   ÃÄÄÄjson-patch-6cb80836d19e0ca4
+³   ³   ³   ³   ÃÄÄÄjsonptr-262e4184f693b047
+³   ³   ³   ³   ÃÄÄÄserde_json-0f4d7de54130b8b0
+³   ³   ³   ³   ÃÄÄÄitoa-a8758a9001f01135
+³   ³   ³   ³   ÃÄÄÄmemchr-03065c283c645776
+³   ³   ³   ³   ÃÄÄÄserde_json-c5169bc26a41dd4f
+³   ³   ³   ³   ÃÄÄÄserde_json-553be65809f52a71
+³   ³   ³   ³   ÃÄÄÄzmij-87e4aa7ad443f12d
+³   ³   ³   ³   ÃÄÄÄzmij-08aed8c3c171b8b1
+³   ³   ³   ³   ÃÄÄÄzmij-bbaef9d295c9b9a4
+³   ³   ³   ³   ÃÄÄÄthiserror-bb0bf2af49900e54
+³   ³   ³   ³   ÃÄÄÄthiserror-295b8b286a75f786
+³   ³   ³   ³   ÃÄÄÄthiserror-bd8ea4cc14d7a3c7
+³   ³   ³   ³   ÃÄÄÄthiserror-impl-b4e7a93fb4faad45
+³   ³   ³   ³   ÃÄÄÄschemars-220d6db4908871c0
+³   ³   ³   ³   ÃÄÄÄdyn-clone-b44e02aa7499e4bb
+³   ³   ³   ³   ÃÄÄÄindexmap-996f7834ac715357
+³   ³   ³   ³   ÃÄÄÄhashbrown-32c9fb729af75c96
+³   ³   ³   ³   ÃÄÄÄindexmap-f00f99b5dac879b6
+³   ³   ³   ³   ÃÄÄÄindexmap-86c2f8fd8f75aa20
+³   ³   ³   ³   ÃÄÄÄautocfg-8c965f4063c10cfd
+³   ³   ³   ³   ÃÄÄÄschemars-8db0b721eee5f877
+³   ³   ³   ³   ÃÄÄÄschemars-f2bdbd922a10c26c
+³   ³   ³   ³   ÃÄÄÄschemars_derive-e6b40fc0a5859842
+³   ³   ³   ³   ÃÄÄÄserde_derive_internals-cb16b69fb0c40fd7
+³   ³   ³   ³   ÃÄÄÄurl-b78a857ed6568634
+³   ³   ³   ³   ÃÄÄÄform_urlencoded-d6ad6c2c93a307f3
+³   ³   ³   ³   ÃÄÄÄpercent-encoding-430cdb9c98e552e7
+³   ³   ³   ³   ÃÄÄÄidna-8c561d3150621220
+³   ³   ³   ³   ÃÄÄÄidna_adapter-c191de9fee4e12fe
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-cafb364bcf82270c
+³   ³   ³   ³   ÃÄÄÄicu_collections-0ba295127063c201
+³   ³   ³   ³   ÃÄÄÄdisplaydoc-12e117d2cc5dc8bd
+³   ³   ³   ³   ÃÄÄÄpotential_utf-ff36a61e6ad1adbf
+³   ³   ³   ³   ÃÄÄÄzerovec-7fa827c3c4bc61e0
+³   ³   ³   ³   ÃÄÄÄyoke-d325aec29826de1b
+³   ³   ³   ³   ÃÄÄÄstable_deref_trait-48ab879ba2e22c76
+³   ³   ³   ³   ÃÄÄÄyoke-derive-cd79a1d6dcf00adf
+³   ³   ³   ³   ÃÄÄÄsynstructure-a72f5bfae830a3c4
+³   ³   ³   ³   ÃÄÄÄzerofrom-76334b22dec253a5
+³   ³   ³   ³   ÃÄÄÄzerofrom-derive-401402adab66e5eb
+³   ³   ³   ³   ÃÄÄÄzerovec-derive-fedc10c48c75e77a
+³   ³   ³   ³   ÃÄÄÄutf8_iter-95d82ed6768ab36e
+³   ³   ³   ³   ÃÄÄÄicu_normalizer_data-aacece9abdcdcc8b
+³   ³   ³   ³   ÃÄÄÄicu_normalizer_data-fcc13466500a304d
+³   ³   ³   ³   ÃÄÄÄicu_normalizer_data-96a52fd262d0f4c6
+³   ³   ³   ³   ÃÄÄÄicu_provider-8090e859b3b58952
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-18c46c96859f99ae
+³   ³   ³   ³   ÃÄÄÄlitemap-bc0b328e814c0a7a
+³   ³   ³   ³   ÃÄÄÄtinystr-69a81d13de121058
+³   ³   ³   ³   ÃÄÄÄwriteable-3f9e5d7c77afadb6
+³   ³   ³   ³   ÃÄÄÄzerotrie-6e82490aafe49957
+³   ³   ³   ³   ÃÄÄÄsmallvec-8cdf188923eb2c00
+³   ³   ³   ³   ÃÄÄÄicu_properties-e13d24cf6614eade
+³   ³   ³   ³   ÃÄÄÄicu_properties_data-22e67dfbb93d8ee9
+³   ³   ³   ³   ÃÄÄÄicu_properties_data-7b1353f86d4d36da
+³   ³   ³   ³   ÃÄÄÄicu_properties_data-cd63a06a3e531c28
+³   ³   ³   ³   ÃÄÄÄuuid-1a997661db8151c5
+³   ³   ³   ³   ÃÄÄÄgetrandom-22cbf390aea25eb0
+³   ³   ³   ³   ÃÄÄÄcfg-if-50da2642d7d10359
+³   ³   ³   ³   ÃÄÄÄgetrandom-35e7bd5f7930b705
+³   ³   ³   ³   ÃÄÄÄgetrandom-e9faf9724e08c3de
+³   ³   ³   ³   ÃÄÄÄsemver-58a97154ae5263a3
+³   ³   ³   ³   ÃÄÄÄtauri-utils-943121b147382917
+³   ³   ³   ³   ÃÄÄÄbrotli-0e1c3509a09ae4a1
+³   ³   ³   ³   ÃÄÄÄalloc-no-stdlib-f942eb6e35a4ef08
+³   ³   ³   ³   ÃÄÄÄalloc-stdlib-f4963da2cb2bf1c8
+³   ³   ³   ³   ÃÄÄÄbrotli-decompressor-91d8f121483fa252
+³   ³   ³   ³   ÃÄÄÄcargo_metadata-b6d1db9b9f0eb083
+³   ³   ³   ³   ÃÄÄÄcamino-541d15d96da2ff80
+³   ³   ³   ³   ÃÄÄÄcamino-5c1c8693e6fcbf64
+³   ³   ³   ³   ÃÄÄÄcamino-9443787eef558086
+³   ³   ³   ³   ÃÄÄÄcargo-platform-07e01be78746cc4c
+³   ³   ³   ³   ÃÄÄÄthiserror-a54c91ae6ec73860
+³   ³   ³   ³   ÃÄÄÄthiserror-e196c11b7df54c50
+³   ³   ³   ³   ÃÄÄÄthiserror-f4d6322d70c52f5c
+³   ³   ³   ³   ÃÄÄÄthiserror-impl-e01168587242ea7a
+³   ³   ³   ³   ÃÄÄÄctor-262999504c7e1fbc
+³   ³   ³   ³   ÃÄÄÄctor-proc-macro-ba51d1894c95f918
+³   ³   ³   ³   ÃÄÄÄdom_query-fad80b4f2ea0b433
+³   ³   ³   ³   ÃÄÄÄbit-set-a80679ff610144e8
+³   ³   ³   ³   ÃÄÄÄbit-vec-0f1595689d637db3
+³   ³   ³   ³   ÃÄÄÄcssparser-e0190bfcda20bb68
+³   ³   ³   ³   ÃÄÄÄcssparser-macros-c5bb283f046e63dd
+³   ³   ³   ³   ÃÄÄÄdtoa-short-2677d0819641c7b5
+³   ³   ³   ³   ÃÄÄÄdtoa-9ec691ecd82ae4ac
+³   ³   ³   ³   ÃÄÄÄphf-a77d9dd699600692
+³   ³   ³   ³   ÃÄÄÄphf_macros-5197527a1480ccf5
+³   ³   ³   ³   ÃÄÄÄphf_generator-18dbea8cfbeeb032
+³   ³   ³   ³   ÃÄÄÄfastrand-f47cf8eb7b2e972b
+³   ³   ³   ³   ÃÄÄÄphf_shared-33f5d032dc3d79af
+³   ³   ³   ³   ÃÄÄÄsiphasher-d89e92747f1de111
+³   ³   ³   ³   ÃÄÄÄfoldhash-44d2bd3163d93bdd
+³   ³   ³   ³   ÃÄÄÄhtml5ever-badb318f148c94e8
+³   ³   ³   ³   ÃÄÄÄlog-4f4a8b25c2d47e46
+³   ³   ³   ³   ÃÄÄÄmarkup5ever-8c8bda23b009af79
+³   ³   ³   ³   ÃÄÄÄtendril-9b7dba683de5f9e0
+³   ³   ³   ³   ÃÄÄÄnew_debug_unreachable-3351dca6712d6be5
+³   ³   ³   ³   ÃÄÄÄutf-8-1fc59436e84361de
+³   ³   ³   ³   ÃÄÄÄweb_atoms-bc9dabf39d037610
+³   ³   ³   ³   ÃÄÄÄstring_cache-586add8518b01d81
+³   ³   ³   ³   ÃÄÄÄparking_lot-0a090e7956492d41
+³   ³   ³   ³   ÃÄÄÄlock_api-adbb4475e277e311
+³   ³   ³   ³   ÃÄÄÄscopeguard-e5d2c7e18f425fea
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-d14810b3d18c05ea
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-e3e5c74a4f654ef3
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-12fc7eb0299b59cc
+³   ³   ³   ³   ÃÄÄÄprecomputed-hash-f5838773140009ff
+³   ³   ³   ³   ÃÄÄÄweb_atoms-327bfd391b0ca720
+³   ³   ³   ³   ÃÄÄÄweb_atoms-100a2f08464b0527
+³   ³   ³   ³   ÃÄÄÄphf_codegen-039b42fba5bbac9e
+³   ³   ³   ³   ÃÄÄÄstring_cache_codegen-f1e9ed79ee31b48e
+³   ³   ³   ³   ÃÄÄÄselectors-16a5546e56767e11
+³   ³   ³   ³   ÃÄÄÄbitflags-4b0fa88a2133ca27
+³   ³   ³   ³   ÃÄÄÄderive_more-6e31518980482dcd
+³   ³   ³   ³   ÃÄÄÄderive_more-impl-bf3272a4e4b3d95b
+³   ³   ³   ³   ÃÄÄÄrustc-hash-0cd0ca309a1e0da6
+³   ³   ³   ³   ÃÄÄÄselectors-0f205fa6de5c7883
+³   ³   ³   ³   ÃÄÄÄselectors-6d390b27f27f34b0
+³   ³   ³   ³   ÃÄÄÄservo_arc-ac1defba9d94612d
+³   ³   ³   ³   ÃÄÄÄdunce-055fb06185da01ec
+³   ³   ³   ³   ÃÄÄÄhttp-7499b226233dde33
+³   ³   ³   ³   ÃÄÄÄbytes-2374475d4ec174da
+³   ³   ³   ³   ÃÄÄÄinfer-87e837a5741ca3c2
+³   ³   ³   ³   ÃÄÄÄcfb-36964e7a42f70f3b
+³   ³   ³   ³   ÃÄÄÄbyteorder-04b068faa2a5ce23
+³   ³   ³   ³   ÃÄÄÄfnv-03937741514939f5
+³   ³   ³   ³   ÃÄÄÄplist-fcc34a2dfb9384b2
+³   ³   ³   ³   ÃÄÄÄbase64-ca72789b075579c1
+³   ³   ³   ³   ÃÄÄÄindexmap-762e5b6277c8ca7c
+³   ³   ³   ³   ÃÄÄÄequivalent-b19a42cd8c2442b0
+³   ³   ³   ³   ÃÄÄÄhashbrown-bae4266ff5dabe82
+³   ³   ³   ³   ÃÄÄÄquick-xml-b74711e98035e839
+³   ³   ³   ³   ÃÄÄÄtime-7621df6bbe7a3951
+³   ³   ³   ³   ÃÄÄÄderanged-75a7f64913ecbeb6
+³   ³   ³   ³   ÃÄÄÄpowerfmt-69c7238331924e58
+³   ³   ³   ³   ÃÄÄÄnum-conv-1a31483c0368ad4f
+³   ³   ³   ³   ÃÄÄÄtime-core-27f04bc81daeef4e
+³   ³   ³   ³   ÃÄÄÄregex-7ccd2a88f08f044b
+³   ³   ³   ³   ÃÄÄÄaho-corasick-bd2c63a8290410c1
+³   ³   ³   ³   ÃÄÄÄregex-automata-cb576d302a3bd8e4
+³   ³   ³   ³   ÃÄÄÄregex-syntax-608f43b0e5826f9f
+³   ³   ³   ³   ÃÄÄÄserde-untagged-d0129385cc0c4653
+³   ³   ³   ³   ÃÄÄÄerased-serde-8bffd7c57ef8d2d0
+³   ³   ³   ³   ÃÄÄÄerased-serde-34a9c2f65112b32c
+³   ³   ³   ³   ÃÄÄÄerased-serde-8f5f4ef94a9443e7
+³   ³   ³   ³   ÃÄÄÄtypeid-dfb99493f7620faa
+³   ³   ³   ³   ÃÄÄÄtypeid-1e51bb5c9d8f5e68
+³   ³   ³   ³   ÃÄÄÄtypeid-d9b972aba2ca812e
+³   ³   ³   ³   ÃÄÄÄserde_with-9e9389f706fc03af
+³   ³   ³   ³   ÃÄÄÄserde_with_macros-bd577e15b69f710b
+³   ³   ³   ³   ÃÄÄÄdarling-839acef1191f89c7
+³   ³   ³   ³   ÃÄÄÄdarling_core-2a0be018ab7a49b8
+³   ³   ³   ³   ÃÄÄÄident_case-68eb72f8b9e5c610
+³   ³   ³   ³   ÃÄÄÄstrsim-39eba2b191cdc78a
+³   ³   ³   ³   ÃÄÄÄdarling_macro-0ecb1950cc63fd8a
+³   ³   ³   ³   ÃÄÄÄtoml-0a01df433e5b6de2
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-d9a2ceed3b0c2bbc
+³   ³   ³   ³   ÃÄÄÄurlpattern-5af3d1b909d83121
+³   ³   ³   ³   ÃÄÄÄunic-ucd-ident-1402fb92ca1b767c
+³   ³   ³   ³   ÃÄÄÄunic-char-property-527bd1fb13d87383
+³   ³   ³   ³   ÃÄÄÄunic-char-range-20d3b3d8ff8ddb0c
+³   ³   ³   ³   ÃÄÄÄunic-ucd-version-7cacdd7714cf71de
+³   ³   ³   ³   ÃÄÄÄunic-common-c67dc0dad09f681e
+³   ³   ³   ³   ÃÄÄÄwalkdir-f9e85412ad159763
+³   ³   ³   ³   ÃÄÄÄsame-file-5f18772a81401d76
+³   ³   ³   ³   ÃÄÄÄwinapi-util-ac1ae5159018481d
+³   ³   ³   ³   ÃÄÄÄtauri-winres-4e3ab25b6f2c47b1
+³   ³   ³   ³   ÃÄÄÄembed-resource-81b6c741c500d773
+³   ³   ³   ³   ÃÄÄÄcc-efe04dd3d132e9b2
+³   ³   ³   ³   ÃÄÄÄfind-msvc-tools-824f9ded730dd358
+³   ³   ³   ³   ÃÄÄÄshlex-f9df91f0b2c0ecd4
+³   ³   ³   ³   ÃÄÄÄrustc_version-7bd0047c53d5eb58
+³   ³   ³   ³   ÃÄÄÄvswhom-622a8f1800072efc
+³   ³   ³   ³   ÃÄÄÄlibc-751e763eb72b7eae
+³   ³   ³   ³   ÃÄÄÄlibc-dd5b03e75856a267
+³   ³   ³   ³   ÃÄÄÄlibc-763fb040b2d663ab
+³   ³   ³   ³   ÃÄÄÄvswhom-sys-e0e9f9d0c69fc482
+³   ³   ³   ³   ÃÄÄÄvswhom-sys-6c35df59f53f60ab
+³   ³   ³   ³   ÃÄÄÄvswhom-sys-e49c8b1e17454e50
+³   ³   ³   ³   ÃÄÄÄwinreg-0df57910f83916bd
+³   ³   ³   ³   ÃÄÄÄwindows-sys-cbbc5b6989251580
+³   ³   ³   ³   ÃÄÄÄwindows-targets-b170585257b0d7b4
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-c5c5726af64828cf
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-b76b1035c894b0c1
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-d70364700e1c05c8
+³   ³   ³   ³   ÃÄÄÄtauri-4c5fc9c73f6fe7c0
+³   ³   ³   ³   ÃÄÄÄtauri-39045cd82f3a736a
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-264ecdae434a2914
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-ac303db40dbaefa2
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-84e0619a52343ffc
+³   ³   ³   ³   ÃÄÄÄserde-9d2f4cb267e4d75f
+³   ³   ³   ³   ÃÄÄÄserde-51226174b1e49143
+³   ³   ³   ³   ÃÄÄÄserde-b4e8599ad30d0584
+³   ³   ³   ³   ÃÄÄÄserde_core-7db73e3b165acf0c
+³   ³   ³   ³   ÃÄÄÄserde_core-35ba2c05936e7c77
+³   ³   ³   ³   ÃÄÄÄserde_core-fdf5f60f2a35bbe7
+³   ³   ³   ³   ÃÄÄÄserde_json-b5a1dd586962f72e
+³   ³   ³   ³   ÃÄÄÄserde_json-9d2f8d5283adfa3f
+³   ³   ³   ³   ÃÄÄÄserde_json-32914949b4053350
+³   ³   ³   ³   ÃÄÄÄtauri-5b2ab44d0771be54
+³   ³   ³   ³   ÃÄÄÄcookie-62e55373b6945abf
+³   ³   ³   ³   ÃÄÄÄcookie-72e6612ab0930e5f
+³   ³   ³   ³   ÃÄÄÄcookie-ba0d0f95d27dc253
+³   ³   ³   ³   ÃÄÄÄversion_check-dfb8931b0be28ab2
+³   ³   ³   ³   ÃÄÄÄtime-4e9bc177fd144aa7
+³   ³   ³   ³   ÃÄÄÄtime-macros-5b8a6d5de9e07283
+³   ³   ³   ³   ÃÄÄÄdirs-926a083496b2220c
+³   ³   ³   ³   ÃÄÄÄdirs-sys-a28f266d2a8637ee
+³   ³   ³   ³   ÃÄÄÄwindows-sys-55b46d3071e6f5be
+³   ³   ³   ³   ÃÄÄÄgetrandom-46f74a3a3f25b987
+³   ³   ³   ³   ÃÄÄÄgetrandom-40d34049b695ef5f
+³   ³   ³   ³   ÃÄÄÄgetrandom-ed1f94bceed784af
+³   ³   ³   ³   ÃÄÄÄmime-73aaa303d72938a8
+³   ³   ³   ³   ÃÄÄÄmuda-22a1480a879f61bb
+³   ³   ³   ³   ÃÄÄÄcrossbeam-channel-2db7acf23903f0e2
+³   ³   ³   ³   ÃÄÄÄcrossbeam-utils-05ff7bf3fa474e2e
+³   ³   ³   ³   ÃÄÄÄcrossbeam-utils-8ba130f70681044d
+³   ³   ³   ³   ÃÄÄÄcrossbeam-utils-8066693d49c7288a
+³   ³   ³   ³   ÃÄÄÄdpi-0cdc6519da80b74c
+³   ³   ³   ³   ÃÄÄÄkeyboard-types-9ba012d8d872f1c1
+³   ³   ³   ³   ÃÄÄÄbitflags-47acdbd1fcfe0019
+³   ³   ³   ³   ÃÄÄÄunicode-segmentation-60cced87b8299ca1
+³   ³   ³   ³   ÃÄÄÄonce_cell-0e6203ca65831a86
+³   ³   ³   ³   ÃÄÄÄpercent-encoding-62d9e9a014bdc3c1
+³   ³   ³   ³   ÃÄÄÄraw-window-handle-97de44c0dc830f12
+³   ³   ³   ³   ÃÄÄÄserde_repr-b4feb6b007bb1372
+³   ³   ³   ³   ÃÄÄÄserialize-to-javascript-29b2dbae4824b9f6
+³   ³   ³   ³   ÃÄÄÄserialize-to-javascript-impl-ce87f5200f6bf13c
+³   ³   ³   ³   ÃÄÄÄtauri-macros-7fdaa8b27d72eda7
+³   ³   ³   ³   ÃÄÄÄtauri-codegen-6787f83a20f130bd
+³   ³   ³   ³   ÃÄÄÄico-0e75dff6ab83d469
+³   ³   ³   ³   ÃÄÄÄpng-e798f97c5a2bf03f
+³   ³   ³   ³   ÃÄÄÄbitflags-993d6e3c3708f1dc
+³   ³   ³   ³   ÃÄÄÄcrc32fast-f063ff96dfd585c6
+³   ³   ³   ³   ÃÄÄÄcrc32fast-7988aeb7d7c85e24
+³   ³   ³   ³   ÃÄÄÄcrc32fast-1c041f34d42edac0
+³   ³   ³   ³   ÃÄÄÄfdeflate-2a12cb157125ce12
+³   ³   ³   ³   ÃÄÄÄsimd-adler32-3150a16d58d9514c
+³   ³   ³   ³   ÃÄÄÄflate2-df70ff1795a3ba6c
+³   ³   ³   ³   ÃÄÄÄminiz_oxide-c1dfb26ef9a9d964
+³   ³   ³   ³   ÃÄÄÄadler2-708dea00d6a216f0
+³   ³   ³   ³   ÃÄÄÄsha2-42f511abcab234b9
+³   ³   ³   ³   ÃÄÄÄcpufeatures-7cfad6cf704d67d6
+³   ³   ³   ³   ÃÄÄÄdigest-9bab93fc182642b2
+³   ³   ³   ³   ÃÄÄÄblock-buffer-0cd2650f577987c1
+³   ³   ³   ³   ÃÄÄÄgeneric-array-f84af665175abae3
+³   ³   ³   ³   ÃÄÄÄgeneric-array-5ec5ee46430be4f3
+³   ³   ³   ³   ÃÄÄÄgeneric-array-91b16dd255e0db51
+³   ³   ³   ³   ÃÄÄÄtypenum-dfb7bb22243cc977
+³   ³   ³   ³   ÃÄÄÄcrypto-common-60448a1f3727900d
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-5ad7c9609ed872ea
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-c1caf11ada0633ea
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-6253ec0457216c42
+³   ³   ³   ³   ÃÄÄÄtauri-utils-b278e60cf393f819
+³   ³   ³   ³   ÃÄÄÄinfer-f0c95f2f6f01473d
+³   ³   ³   ³   ÃÄÄÄcfb-69e35df78e83640d
+³   ³   ³   ³   ÃÄÄÄuuid-f05025a0994dc573
+³   ³   ³   ³   ÃÄÄÄjson-patch-04f9ca7f29104511
+³   ³   ³   ³   ÃÄÄÄjsonptr-0a3849578ece2304
+³   ³   ³   ³   ÃÄÄÄphf-3f0d442b5d90d721
+³   ³   ³   ³   ÃÄÄÄphf_shared-9ee7a876cd36c6e4
+³   ³   ³   ³   ÃÄÄÄplist-74a02d039bb26954
+³   ³   ³   ³   ÃÄÄÄsemver-7a8f27d67c4db3ea
+³   ³   ³   ³   ÃÄÄÄserde-untagged-7a18d21ac3d53b16
+³   ³   ³   ³   ÃÄÄÄerased-serde-15beca30643b5e3e
+³   ³   ³   ³   ÃÄÄÄserde_with-46e5940a08d47ded
+³   ³   ³   ³   ÃÄÄÄtoml-dde3e57236e4b8b4
+³   ³   ³   ³   ÃÄÄÄserde_spanned-7317107a49582ddd
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-4637051da0eaf5e8
+³   ³   ³   ³   ÃÄÄÄurl-8ab301b92ebdc28c
+³   ³   ³   ³   ÃÄÄÄform_urlencoded-ea1d769b6e871533
+³   ³   ³   ³   ÃÄÄÄidna-594299fb2c2fa1d3
+³   ³   ³   ³   ÃÄÄÄidna_adapter-9255017a6c7c2ebe
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-3efaf73cca371c9c
+³   ³   ³   ³   ÃÄÄÄicu_collections-792e34b8645d9f73
+³   ³   ³   ³   ÃÄÄÄpotential_utf-16073ee1595c5e47
+³   ³   ³   ³   ÃÄÄÄzerovec-5358ca31137be707
+³   ³   ³   ³   ÃÄÄÄyoke-3596c3bcc76239a7
+³   ³   ³   ³   ÃÄÄÄstable_deref_trait-9030104b42672411
+³   ³   ³   ³   ÃÄÄÄicu_provider-bddbba9c85ab3e41
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-01cbaa5b14f4cf3f
+³   ³   ³   ³   ÃÄÄÄtinystr-6b47a5ed4a603a5a
+³   ³   ³   ³   ÃÄÄÄzerotrie-8ad9b2d8092dcc55
+³   ³   ³   ³   ÃÄÄÄicu_properties-7fedf5ff938cab56
+³   ³   ³   ³   ÃÄÄÄurlpattern-227f045dd63f7fb5
+³   ³   ³   ³   ÃÄÄÄwalkdir-cd3f58a82ed43dfa
+³   ³   ³   ³   ÃÄÄÄsame-file-e35b9362df4d3a33
+³   ³   ³   ³   ÃÄÄÄwinapi-util-a870bda737e06acf
+³   ³   ³   ³   ÃÄÄÄwebview2-com-009d17f5649efc7b
+³   ³   ³   ³   ÃÄÄÄwebview2-com-macros-2597ec9040080535
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-0f104fa0059fefdd
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-c5d39ecf43b9d019
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-60d56c135baf87e8
+³   ³   ³   ³   ÃÄÄÄwindows-72235a56720a761a
+³   ³   ³   ³   ÃÄÄÄwindows-collections-738dac91d05a186c
+³   ³   ³   ³   ÃÄÄÄwindows-core-689b286589ea2271
+³   ³   ³   ³   ÃÄÄÄwindows-implement-3df8c5e0084bc1cc
+³   ³   ³   ³   ÃÄÄÄwindows-interface-67e8dee7b3c79c12
+³   ³   ³   ³   ÃÄÄÄwindows-link-e5d67dbb9625e185
+³   ³   ³   ³   ÃÄÄÄwindows-result-79f61ce203a58cae
+³   ³   ³   ³   ÃÄÄÄwindows-strings-de162edd9fd4c3ba
+³   ³   ³   ³   ÃÄÄÄwindows-future-377b6c4524a68ad9
+³   ³   ³   ³   ÃÄÄÄwindows-threading-48c0063f702dbde5
+³   ³   ³   ³   ÃÄÄÄwindows-numerics-aa7e51fdb5ef7465
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-wry-fccf154ade31d808
+³   ³   ³   ³   ÃÄÄÄsoftbuffer-d6d119a9c0a00097
+³   ³   ³   ³   ÃÄÄÄtracing-32b98a9d9c72b1d9
+³   ³   ³   ³   ÃÄÄÄpin-project-lite-c9545d3e16671299
+³   ³   ³   ³   ÃÄÄÄtracing-core-59500df230436d57
+³   ³   ³   ³   ÃÄÄÄtao-96aa7e4b8ce375ac
+³   ³   ³   ³   ÃÄÄÄwindows-version-311dc7bf13e799e0
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-wry-cb0d89f5b26c54cd
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-wry-52428c4b1c675e16
+³   ³   ³   ³   ÃÄÄÄwry-4de9b51280bfe679
+³   ³   ³   ³   ÃÄÄÄwry-3fa6c6b38befdde5
+³   ³   ³   ³   ÃÄÄÄwry-8d1ecc6b8379e6a6
+³   ³   ³   ³   ÃÄÄÄtokio-307374d0b44db55c
+³   ³   ³   ³   ÃÄÄÄwindow-vibrancy-5a4d2925c6e02e7b
+³   ³   ³   ³   ÃÄÄÄwindows-sys-e74719f1aaf3fcd4
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-835bf6a75bf57414
+³   ³   ³   ³   ÃÄÄÄopen-5024cac9332d21b7
+³   ³   ³   ³   ÃÄÄÄaizavr-0d87af9cf1c12575
+³   ³   ³   ³   ÃÄÄÄaizavr-bbad05a95bb6ae62
+³   ³   ³   ³   ÃÄÄÄaizavr-6e4a43cf38770060
+³   ³   ³   ³   ÃÄÄÄtauri-build-48521ca23ea5be08
+³   ³   ³   ³   ÃÄÄÄanyhow-fdfe26a7faf214cf
+³   ³   ³   ³   ÃÄÄÄcargo_toml-7a2b41e012b8fad1
+³   ³   ³   ³   ÃÄÄÄserde-34ea32c9c9d1c7bd
+³   ³   ³   ³   ÃÄÄÄserde_core-88b1e1a5ec1be8fe
+³   ³   ³   ³   ÃÄÄÄserde_core-4fc4882f15e7293d
+³   ³   ³   ³   ÃÄÄÄserde_core-316d7a7cca449a97
+³   ³   ³   ³   ÃÄÄÄserde_derive-ee6745d1e92cb8b8
+³   ³   ³   ³   ÃÄÄÄsyn-6d8924c60d615299
+³   ³   ³   ³   ÃÄÄÄtoml-92cdd1155d240e81
+³   ³   ³   ³   ÃÄÄÄserde_spanned-9f69ec73c8b7594c
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-0a3fc27ae7ff8b06
+³   ³   ³   ³   ÃÄÄÄtoml_parser-f9142e305124388d
+³   ³   ³   ³   ÃÄÄÄwinnow-ba2c4273f09b1c23
+³   ³   ³   ³   ÃÄÄÄtoml_writer-97761e311a6d9bcd
+³   ³   ³   ³   ÃÄÄÄdirs-c83c62b36583f62a
+³   ³   ³   ³   ÃÄÄÄdirs-sys-983023e869a604dd
+³   ³   ³   ³   ÃÄÄÄoption-ext-8b598fdeb953817e
+³   ³   ³   ³   ÃÄÄÄwindows-sys-dd725aa47263235c
+³   ³   ³   ³   ÃÄÄÄwindows-link-3fe80788267f4d9a
+³   ³   ³   ³   ÃÄÄÄglob-3170584f34ccfab7
+³   ³   ³   ³   ÃÄÄÄheck-c8dbe9f7c38c81ae
+³   ³   ³   ³   ÃÄÄÄjson-patch-eb37ef11d3e076c8
+³   ³   ³   ³   ÃÄÄÄjsonptr-bb24159ce606587a
+³   ³   ³   ³   ÃÄÄÄserde_json-a5d61737ddd8a8df
+³   ³   ³   ³   ÃÄÄÄitoa-a5ac65ed78710ab0
+³   ³   ³   ³   ÃÄÄÄmemchr-85906ea4b593e79f
+³   ³   ³   ³   ÃÄÄÄserde_json-e6fcd8ef18bc5d59
+³   ³   ³   ³   ÃÄÄÄserde_json-d5a23e5b046e18d2
+³   ³   ³   ³   ÃÄÄÄzmij-df1324a04a1eaff4
+³   ³   ³   ³   ÃÄÄÄthiserror-834a08e56b246fed
+³   ³   ³   ³   ÃÄÄÄthiserror-impl-d5b61447fb0c4d7b
+³   ³   ³   ³   ÃÄÄÄschemars-83161daa04aeb216
+³   ³   ³   ³   ÃÄÄÄindexmap-a72936245a6b6bc1
+³   ³   ³   ³   ÃÄÄÄschemars_derive-8488936eab996bd4
+³   ³   ³   ³   ÃÄÄÄserde_derive_internals-074f2c5f469d58ff
+³   ³   ³   ³   ÃÄÄÄurl-a16404448897cf17
+³   ³   ³   ³   ÃÄÄÄform_urlencoded-b6af7cd73d837932
+³   ³   ³   ³   ÃÄÄÄpercent-encoding-b4d286fa0635e345
+³   ³   ³   ³   ÃÄÄÄidna-0e97ce86fc1631d2
+³   ³   ³   ³   ÃÄÄÄidna_adapter-374e1a8b9f203368
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-349d4392964afa95
+³   ³   ³   ³   ÃÄÄÄicu_collections-1b70fd4f0db44d94
+³   ³   ³   ³   ÃÄÄÄdisplaydoc-c12036317c06720c
+³   ³   ³   ³   ÃÄÄÄpotential_utf-c51dd49d73cc7d51
+³   ³   ³   ³   ÃÄÄÄzerovec-cf3c2de91a86fc75
+³   ³   ³   ³   ÃÄÄÄyoke-cd31af91796b92f4
+³   ³   ³   ³   ÃÄÄÄyoke-derive-d7235db2bdb4c79b
+³   ³   ³   ³   ÃÄÄÄsynstructure-50a5947bd8f8fab5
+³   ³   ³   ³   ÃÄÄÄzerofrom-238cab90b7fea840
+³   ³   ³   ³   ÃÄÄÄzerofrom-derive-5ec839cf13d34a86
+³   ³   ³   ³   ÃÄÄÄzerovec-derive-65941eaf0f0ebfb6
+³   ³   ³   ³   ÃÄÄÄutf8_iter-bb38bb63c46a95fe
+³   ³   ³   ³   ÃÄÄÄicu_normalizer_data-dc4c56daec49f3ba
+³   ³   ³   ³   ÃÄÄÄicu_provider-eefe26bfc52ab15f
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-adc0bbb526147ce9
+³   ³   ³   ³   ÃÄÄÄlitemap-12dee5cf44ffe6c3
+³   ³   ³   ³   ÃÄÄÄtinystr-c411966be11e29cf
+³   ³   ³   ³   ÃÄÄÄwriteable-7cdd303c98cadfc0
+³   ³   ³   ³   ÃÄÄÄzerotrie-bb8bff004615b599
+³   ³   ³   ³   ÃÄÄÄsmallvec-b298682c54a24465
+³   ³   ³   ³   ÃÄÄÄicu_properties-63adc4f1ac43fd60
+³   ³   ³   ³   ÃÄÄÄicu_properties_data-f973197500de78bc
+³   ³   ³   ³   ÃÄÄÄuuid-c6d9174929e3328c
+³   ³   ³   ³   ÃÄÄÄgetrandom-2d327e911b083995
+³   ³   ³   ³   ÃÄÄÄcfg-if-3dccf8372c0e472c
+³   ³   ³   ³   ÃÄÄÄgetrandom-28f04a6bba61f62d
+³   ³   ³   ³   ÃÄÄÄsemver-cfd7efa4f09ab477
+³   ³   ³   ³   ÃÄÄÄtauri-utils-b739d4ccfc3ed51f
+³   ³   ³   ³   ÃÄÄÄbrotli-5cab69d8edff6480
+³   ³   ³   ³   ÃÄÄÄalloc-no-stdlib-5b70bb3317bfa780
+³   ³   ³   ³   ÃÄÄÄalloc-stdlib-05c547ea86eff591
+³   ³   ³   ³   ÃÄÄÄbrotli-decompressor-a69c98a46b48589c
+³   ³   ³   ³   ÃÄÄÄcargo_metadata-974b78d6e58bc4bc
+³   ³   ³   ³   ÃÄÄÄcamino-47bfb92e755ba438
+³   ³   ³   ³   ÃÄÄÄcargo-platform-c69eff618d686b89
+³   ³   ³   ³   ÃÄÄÄthiserror-95519493983608f3
+³   ³   ³   ³   ÃÄÄÄthiserror-impl-4b574e8ee59ad49f
+³   ³   ³   ³   ÃÄÄÄctor-7bff8369d9b53eaf
+³   ³   ³   ³   ÃÄÄÄdom_query-3ed0b85c847cd169
+³   ³   ³   ³   ÃÄÄÄcssparser-7191daa96f015293
+³   ³   ³   ³   ÃÄÄÄcssparser-macros-a752e4517b914718
+³   ³   ³   ³   ÃÄÄÄphf-fb66a19f719c68ac
+³   ³   ³   ³   ÃÄÄÄphf_macros-7745045be147ccb2
+³   ³   ³   ³   ÃÄÄÄphf_generator-111f6ee67736b8ca
+³   ³   ³   ³   ÃÄÄÄphf_shared-38d296033c1b73ef
+³   ³   ³   ³   ÃÄÄÄsiphasher-eb85d5c82ffed796
+³   ³   ³   ³   ÃÄÄÄhtml5ever-dd192a37979a1994
+³   ³   ³   ³   ÃÄÄÄlog-ed32f77eca99c11c
+³   ³   ³   ³   ÃÄÄÄmarkup5ever-28bb49fd3a87b3e2
+³   ³   ³   ³   ÃÄÄÄweb_atoms-da2ebd25074a0f47
+³   ³   ³   ³   ÃÄÄÄstring_cache-66e775987b6efc76
+³   ³   ³   ³   ÃÄÄÄparking_lot-4b7a1eebdd809766
+³   ³   ³   ³   ÃÄÄÄlock_api-6aaf0458425a928f
+³   ³   ³   ³   ÃÄÄÄscopeguard-c2dae62dac72d0f0
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-cad3b891b9cfa662
+³   ³   ³   ³   ÃÄÄÄweb_atoms-b1c40434e587fe86
+³   ³   ³   ³   ÃÄÄÄweb_atoms-03fa3c46c9c11648
+³   ³   ³   ³   ÃÄÄÄphf_codegen-ccf1a9a258788643
+³   ³   ³   ³   ÃÄÄÄstring_cache_codegen-a941fbdfc4855057
+³   ³   ³   ³   ÃÄÄÄselectors-a4cb57ee3232475b
+³   ³   ³   ³   ÃÄÄÄderive_more-7236be32b58f1e45
+³   ³   ³   ³   ÃÄÄÄderive_more-impl-76f87fcabf315642
+³   ³   ³   ³   ÃÄÄÄselectors-282703b58d40952c
+³   ³   ³   ³   ÃÄÄÄselectors-e0e969aaed29c8ca
+³   ³   ³   ³   ÃÄÄÄdunce-5ab542988ccbd109
+³   ³   ³   ³   ÃÄÄÄhttp-d3a32c2e72666e65
+³   ³   ³   ³   ÃÄÄÄbytes-62aeb4869e87785d
+³   ³   ³   ³   ÃÄÄÄinfer-5b7f047af1a3ae5c
+³   ³   ³   ³   ÃÄÄÄcfb-711dea14f547c587
+³   ³   ³   ³   ÃÄÄÄbyteorder-12e3dfe6a4702180
+³   ³   ³   ³   ÃÄÄÄfnv-fc42aaace071c35e
+³   ³   ³   ³   ÃÄÄÄplist-597d07bf85fe6151
+³   ³   ³   ³   ÃÄÄÄbase64-1209aafce1853511
+³   ³   ³   ³   ÃÄÄÄindexmap-a7784d42640b2afd
+³   ³   ³   ³   ÃÄÄÄequivalent-63f063dc8aab49c3
+³   ³   ³   ³   ÃÄÄÄhashbrown-74acd9a8fb5dc139
+³   ³   ³   ³   ÃÄÄÄquick-xml-4e325ae894b484db
+³   ³   ³   ³   ÃÄÄÄtime-2045d857f19a65ca
+³   ³   ³   ³   ÃÄÄÄderanged-0f7eec9edefa8e34
+³   ³   ³   ³   ÃÄÄÄpowerfmt-d1b4ae4f1304feb2
+³   ³   ³   ³   ÃÄÄÄnum-conv-b8d03128bceb4342
+³   ³   ³   ³   ÃÄÄÄtime-core-ea7a8a9476a4f02b
+³   ³   ³   ³   ÃÄÄÄregex-38c7e1c6570d99f5
+³   ³   ³   ³   ÃÄÄÄaho-corasick-57fa3a6ee9629e6b
+³   ³   ³   ³   ÃÄÄÄregex-automata-f6849a75f0a231c1
+³   ³   ³   ³   ÃÄÄÄregex-syntax-966008bdd0de1cf0
+³   ³   ³   ³   ÃÄÄÄserde-untagged-c521ceab46338aae
+³   ³   ³   ³   ÃÄÄÄerased-serde-ce4251f78c17e7e9
+³   ³   ³   ³   ÃÄÄÄtypeid-c8cdfdaabbe0798f
+³   ³   ³   ³   ÃÄÄÄserde_with-5da295de195d4c0a
+³   ³   ³   ³   ÃÄÄÄserde_with_macros-c31c218f4cdbf9fc
+³   ³   ³   ³   ÃÄÄÄdarling-f8cbe9bafb1f03f8
+³   ³   ³   ³   ÃÄÄÄdarling_core-5f0fa15603a1318c
+³   ³   ³   ³   ÃÄÄÄdarling_macro-5029253fca6da273
+³   ³   ³   ³   ÃÄÄÄtoml-f63d5e10e47e7d7d
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-5c816917ba32eea2
+³   ³   ³   ³   ÃÄÄÄurlpattern-1625c54bdc76738c
+³   ³   ³   ³   ÃÄÄÄunic-ucd-ident-c1b43dd8f8462f16
+³   ³   ³   ³   ÃÄÄÄunic-char-property-bd10f656de90eb45
+³   ³   ³   ³   ÃÄÄÄunic-char-range-1e2221ddc795e9ed
+³   ³   ³   ³   ÃÄÄÄunic-ucd-version-f86b6bd61de42ca5
+³   ³   ³   ³   ÃÄÄÄunic-common-fb7fce4f9052573c
+³   ³   ³   ³   ÃÄÄÄwalkdir-fe05a867563514c3
+³   ³   ³   ³   ÃÄÄÄsame-file-7e6afcbd2b3b438a
+³   ³   ³   ³   ÃÄÄÄwinapi-util-4bb84ce4de088a26
+³   ³   ³   ³   ÃÄÄÄtauri-winres-d9a4ca097742f253
+³   ³   ³   ³   ÃÄÄÄembed-resource-10383005f2af76b8
+³   ³   ³   ³   ÃÄÄÄrustc_version-5df3d39ca11064e5
+³   ³   ³   ³   ÃÄÄÄvswhom-c3684552677cd0cb
+³   ³   ³   ³   ÃÄÄÄlibc-55872893c005723f
+³   ³   ³   ³   ÃÄÄÄvswhom-sys-ab1c79db5596b3cb
+³   ³   ³   ³   ÃÄÄÄwinreg-c1f74321e42b6d7a
+³   ³   ³   ³   ÃÄÄÄwindows-sys-486b1c8286b01fc6
+³   ³   ³   ³   ÃÄÄÄwindows-targets-9f507c2d5b9160fe
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-de91122bf019b2bf
+³   ³   ³   ³   ÃÄÄÄtauri-666e40b7088a1b47
+³   ³   ³   ³   ÃÄÄÄtauri-8daf5be09bd60f29
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-79ba62b92daf9561
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-baa21016ebb962f5
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-0cb234d7326e76da
+³   ³   ³   ³   ÃÄÄÄkeyring-88267d06cf87cf2b
+³   ³   ³   ³   ÃÄÄÄlog-9f970a89d265efe3
+³   ³   ³   ³   ÃÄÄÄzeroize-cc2d6ced21dd28e3
+³   ³   ³   ³   ÃÄÄÄreqwest-b23c4beb989fa117
+³   ³   ³   ³   ÃÄÄÄbase64-8e3d103993551ef3
+³   ³   ³   ³   ÃÄÄÄbytes-5e0d69cde3fec79e
+³   ³   ³   ³   ÃÄÄÄencoding_rs-15b7121df0097a84
+³   ³   ³   ³   ÃÄÄÄcfg-if-38379743a7c2c287
+³   ³   ³   ³   ÃÄÄÄfutures-core-3e3ed5c46720cded
+³   ³   ³   ³   ÃÄÄÄfutures-util-3e0c1e1ecc5d3651
+³   ³   ³   ³   ÃÄÄÄfutures-io-ed7a0d4cf8bbbbb0
+³   ³   ³   ³   ÃÄÄÄfutures-sink-e76d17340c3b29b8
+³   ³   ³   ³   ÃÄÄÄfutures-task-38a4cfcc801ecf4e
+³   ³   ³   ³   ÃÄÄÄmemchr-35430d668ac66b0c
+³   ³   ³   ³   ÃÄÄÄpin-project-lite-65a923b6a1ce6e69
+³   ³   ³   ³   ÃÄÄÄslab-d1f8dc39218e386f
+³   ³   ³   ³   ÃÄÄÄh2-2967e587786804be
+³   ³   ³   ³   ÃÄÄÄatomic-waker-bc8419b62445f532
+³   ³   ³   ³   ÃÄÄÄfnv-a2dd95a39aae649a
+³   ³   ³   ³   ÃÄÄÄhttp-edae6d939cabcd4c
+³   ³   ³   ³   ÃÄÄÄitoa-14018c84296d4b84
+³   ³   ³   ³   ÃÄÄÄindexmap-6d4d8ecc6c7a953a
+³   ³   ³   ³   ÃÄÄÄequivalent-388c529534c59c75
+³   ³   ³   ³   ÃÄÄÄhashbrown-f080cf5c035e22d8
+³   ³   ³   ³   ÃÄÄÄtokio-a16912b47c1a6fcf
+³   ³   ³   ³   ÃÄÄÄmio-5a6413b12a2cbb56
+³   ³   ³   ³   ÃÄÄÄwindows-sys-2eb9aac655c40ed2
+³   ³   ³   ³   ÃÄÄÄwindows-link-54c7aa1677a9df5f
+³   ³   ³   ³   ÃÄÄÄparking_lot-2678dc8b727cd5a9
+³   ³   ³   ³   ÃÄÄÄlock_api-f5f4b642b5b1af84
+³   ³   ³   ³   ÃÄÄÄscopeguard-7b79691b0fdd1d97
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-ca76deff0287e0b6
+³   ³   ³   ³   ÃÄÄÄsmallvec-f2333e4772998970
+³   ³   ³   ³   ÃÄÄÄsocket2-ff0938001f8156ee
+³   ³   ³   ³   ÃÄÄÄtokio-macros-b53c036af6d38c09
+³   ³   ³   ³   ÃÄÄÄtokio-util-e02e9f54f6a7880d
+³   ³   ³   ³   ÃÄÄÄtracing-6181fbdbe23ce85e
+³   ³   ³   ³   ÃÄÄÄtracing-attributes-3732205dfefb29ae
+³   ³   ³   ³   ÃÄÄÄtracing-core-512b29c6d3b5ece4
+³   ³   ³   ³   ÃÄÄÄonce_cell-6270f440ee974197
+³   ³   ³   ³   ÃÄÄÄhttp-body-dd33ba4d0d564827
+³   ³   ³   ³   ÃÄÄÄhttp-body-util-b4f655e2be5c5b10
+³   ³   ³   ³   ÃÄÄÄhyper-7acacd98375e9dc9
+³   ³   ³   ³   ÃÄÄÄfutures-channel-ffe63e2276028abc
+³   ³   ³   ³   ÃÄÄÄhttparse-0e4d88e0b7e28006
+³   ³   ³   ³   ÃÄÄÄhttparse-2c652abd85dc21ee
+³   ³   ³   ³   ÃÄÄÄhttparse-4dc4630409fa7385
+³   ³   ³   ³   ÃÄÄÄwant-26d30de424364d5a
+³   ³   ³   ³   ÃÄÄÄtry-lock-e5b1dbb23ca1d86b
+³   ³   ³   ³   ÃÄÄÄhyper-tls-780ee1be56229175
+³   ³   ³   ³   ÃÄÄÄhyper-util-c9b19c664c992602
+³   ³   ³   ³   ÃÄÄÄipnet-5257567803349912
+³   ³   ³   ³   ÃÄÄÄlibc-43231006db61dceb
+³   ³   ³   ³   ÃÄÄÄpercent-encoding-6e03319ebaec33ad
+³   ³   ³   ³   ÃÄÄÄtower-service-0b0b060d8cc51a8b
+³   ³   ³   ³   ÃÄÄÄwindows-registry-8d8db6b9da911373
+³   ³   ³   ³   ÃÄÄÄwindows-result-5ca89e770b3aaf3c
+³   ³   ³   ³   ÃÄÄÄwindows-strings-f17df2e9b3268bf4
+³   ³   ³   ³   ÃÄÄÄnative-tls-09748bc0aeae2de3
+³   ³   ³   ³   ÃÄÄÄnative-tls-10c45e54438ca551
+³   ³   ³   ³   ÃÄÄÄnative-tls-33399c41462f9840
+³   ³   ³   ³   ÃÄÄÄschannel-2b99f8dec498bcba
+³   ³   ³   ³   ÃÄÄÄtokio-native-tls-14f8c752d16e3969
+³   ³   ³   ³   ÃÄÄÄmime-b38b8ff46093bf61
+³   ³   ³   ³   ÃÄÄÄrustls-pki-types-9dbc6f59677e7bfd
+³   ³   ³   ³   ÃÄÄÄserde-bb42fc9156bba89d
+³   ³   ³   ³   ÃÄÄÄserde_core-26908a9544e5fdfe
+³   ³   ³   ³   ÃÄÄÄserde_json-a08b86de7b4dc1f2
+³   ³   ³   ³   ÃÄÄÄzmij-7fc836199593576b
+³   ³   ³   ³   ÃÄÄÄserde_urlencoded-f630263250bc7f84
+³   ³   ³   ³   ÃÄÄÄform_urlencoded-7832b285492917de
+³   ³   ³   ³   ÃÄÄÄryu-be3cedacaba87e89
+³   ³   ³   ³   ÃÄÄÄsync_wrapper-99d0e1101c458ffe
+³   ³   ³   ³   ÃÄÄÄtower-d34184766a80e84e
+³   ³   ³   ³   ÃÄÄÄtower-layer-9e47e6698187b0f4
+³   ³   ³   ³   ÃÄÄÄtower-http-973902a4c592e69b
+³   ³   ³   ³   ÃÄÄÄbitflags-746ab18c2188a3aa
+³   ³   ³   ³   ÃÄÄÄurl-b0162905c64c0aab
+³   ³   ³   ³   ÃÄÄÄidna-22cf98c424c5314a
+³   ³   ³   ³   ÃÄÄÄidna_adapter-ae664f16debfdd98
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-6c56eac7342afb74
+³   ³   ³   ³   ÃÄÄÄicu_collections-0ccd3c7a69f7376a
+³   ³   ³   ³   ÃÄÄÄpotential_utf-7509f229e6658205
+³   ³   ³   ³   ÃÄÄÄzerovec-bb20b0900a140584
+³   ³   ³   ³   ÃÄÄÄyoke-3600968ffb691638
+³   ³   ³   ³   ÃÄÄÄstable_deref_trait-3f46ad6dcd13377b
+³   ³   ³   ³   ÃÄÄÄzerofrom-c730489f7f87e1b9
+³   ³   ³   ³   ÃÄÄÄutf8_iter-1b80a6801e47035d
+³   ³   ³   ³   ÃÄÄÄicu_normalizer_data-86db14d19eb4d4fb
+³   ³   ³   ³   ÃÄÄÄicu_provider-482bdb61f9962469
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-aa217d8746df2467
+³   ³   ³   ³   ÃÄÄÄlitemap-91ce8cac9b107a62
+³   ³   ³   ³   ÃÄÄÄtinystr-cccc6a17e9628c5e
+³   ³   ³   ³   ÃÄÄÄwriteable-b6b647f06e58c236
+³   ³   ³   ³   ÃÄÄÄzerotrie-8ba4f1b73f734a07
+³   ³   ³   ³   ÃÄÄÄicu_properties-0bd71439b3de0364
+³   ³   ³   ³   ÃÄÄÄicu_properties_data-7ef5f4f6cfd0040d
+³   ³   ³   ³   ÃÄÄÄsqlx-961abfdc025237d8
+³   ³   ³   ³   ÃÄÄÄsqlx-core-8f1c0e5c4ae74ad3
+³   ³   ³   ³   ÃÄÄÄcrc-cd9d6c3b5c88feac
+³   ³   ³   ³   ÃÄÄÄcrc-catalog-2abf0ac797b8f23e
+³   ³   ³   ³   ÃÄÄÄcrossbeam-queue-be9b832523609add
+³   ³   ³   ³   ÃÄÄÄcrossbeam-utils-45851e37070cd696
+³   ³   ³   ³   ÃÄÄÄeither-5234090280560c96
+³   ³   ³   ³   ÃÄÄÄevent-listener-3a98eab8e14bafba
+³   ³   ³   ³   ÃÄÄÄconcurrent-queue-29375e767d3bf667
+³   ³   ³   ³   ÃÄÄÄparking-e10bcf95181e8f58
+³   ³   ³   ³   ÃÄÄÄfutures-intrusive-84735a5f66685dca
+³   ³   ³   ³   ÃÄÄÄhashbrown-0286a9f742c1e1e9
+³   ³   ³   ³   ÃÄÄÄallocator-api2-f9604a23100df9e0
+³   ³   ³   ³   ÃÄÄÄfoldhash-c856b254a64c8007
+³   ³   ³   ³   ÃÄÄÄhashlink-b00b673df280f752
+³   ³   ³   ³   ÃÄÄÄsha2-4e03d4e34e501f0c
+³   ³   ³   ³   ÃÄÄÄcpufeatures-cb84bc976b1f9d88
+³   ³   ³   ³   ÃÄÄÄdigest-8817b6c467afd8c6
+³   ³   ³   ³   ÃÄÄÄblock-buffer-22182e527663229d
+³   ³   ³   ³   ÃÄÄÄgeneric-array-8e2cdc2ef6239554
+³   ³   ³   ³   ÃÄÄÄgeneric-array-5ed0f37b26cdacc4
+³   ³   ³   ³   ÃÄÄÄtypenum-8402f8972fdf6ad5
+³   ³   ³   ³   ÃÄÄÄcrypto-common-046a6f144122099c
+³   ³   ³   ³   ÃÄÄÄthiserror-d3ccb5c1eb025c59
+³   ³   ³   ³   ÃÄÄÄtokio-stream-2cc687e24e0ca70d
+³   ³   ³   ³   ÃÄÄÄsqlx-macros-2864630dea9abf28
+³   ³   ³   ³   ÃÄÄÄsqlx-core-6f0f37a6842a74fb
+³   ³   ³   ³   ÃÄÄÄcrc-6cf9e7d5c69e16bf
+³   ³   ³   ³   ÃÄÄÄcrc-catalog-979f58d667c3f819
+³   ³   ³   ³   ÃÄÄÄcrossbeam-queue-2e270679194bd892
+³   ³   ³   ³   ÃÄÄÄcrossbeam-utils-4f4437cce3d5c1b7
+³   ³   ³   ³   ÃÄÄÄeither-3e8004a6b60ea22f
+³   ³   ³   ³   ÃÄÄÄevent-listener-1e4f21f041b5333f
+³   ³   ³   ³   ÃÄÄÄconcurrent-queue-b73cb3b1b748e41f
+³   ³   ³   ³   ÃÄÄÄparking-a01caf7e2977fad7
+³   ³   ³   ³   ÃÄÄÄpin-project-lite-818bb3e0093afe1c
+³   ³   ³   ³   ÃÄÄÄfutures-core-07833bf0457c4bc7
+³   ³   ³   ³   ÃÄÄÄfutures-intrusive-325e932a4f7e64b5
+³   ³   ³   ³   ÃÄÄÄfutures-io-9be3f78cdcb27151
+³   ³   ³   ³   ÃÄÄÄfutures-util-79f5d974f8eafb09
+³   ³   ³   ³   ÃÄÄÄfutures-sink-ea2ff23e633c1fe9
+³   ³   ³   ³   ÃÄÄÄfutures-task-9c403c4e85a49690
+³   ³   ³   ³   ÃÄÄÄslab-4262d13234e4ebd8
+³   ³   ³   ³   ÃÄÄÄhashbrown-ad0a939f1dc56da8
+³   ³   ³   ³   ÃÄÄÄallocator-api2-946d9b20e12d1f07
+³   ³   ³   ³   ÃÄÄÄfoldhash-0e02094d3fbafa66
+³   ³   ³   ³   ÃÄÄÄhashlink-8f3bfe92ab2af265
+³   ³   ³   ³   ÃÄÄÄonce_cell-da3c74cda9c5f154
+³   ³   ³   ³   ÃÄÄÄsha2-6a64b6f7f4824413
+³   ³   ³   ³   ÃÄÄÄdigest-9f6afb886d27fe83
+³   ³   ³   ³   ÃÄÄÄblock-buffer-40ac9b2183bd7ddc
+³   ³   ³   ³   ÃÄÄÄgeneric-array-80c5f243602b6108
+³   ³   ³   ³   ÃÄÄÄcrypto-common-7bc114a9a9ec33f6
+³   ³   ³   ³   ÃÄÄÄtokio-e6e7db9d1de8f18d
+³   ³   ³   ³   ÃÄÄÄmio-ca2df52286aac49d
+³   ³   ³   ³   ÃÄÄÄsocket2-06ed91621ee95317
+³   ³   ³   ³   ÃÄÄÄtokio-stream-4f002be0c3d97c1b
+³   ³   ³   ³   ÃÄÄÄtracing-fb65e81d76b7f6c7
+³   ³   ³   ³   ÃÄÄÄtracing-core-1229c6c89f72711c
+³   ³   ³   ³   ÃÄÄÄsqlx-macros-core-0c76157b3b2a2e69
+³   ³   ³   ³   ÃÄÄÄdotenvy-11698b2923ec2b88
+³   ³   ³   ³   ÃÄÄÄhex-2e8eae3fb7bffc9b
+³   ³   ³   ³   ÃÄÄÄsqlx-sqlite-b1e450c7cbbba997
+³   ³   ³   ³   ÃÄÄÄatoi-9408675c591eb53e
+³   ³   ³   ³   ÃÄÄÄnum-traits-5330c4108e943a4a
+³   ³   ³   ³   ÃÄÄÄnum-traits-47fe1348175626be
+³   ³   ³   ³   ÃÄÄÄnum-traits-7471ce6e6595e59b
+³   ³   ³   ³   ÃÄÄÄflume-9ba641fcf90f2079
+³   ³   ³   ³   ÃÄÄÄspin-e5cd738e381f5189
+³   ³   ³   ³   ÃÄÄÄfutures-channel-0317f2b6d092c493
+³   ³   ³   ³   ÃÄÄÄfutures-executor-523cb3d632b52861
+³   ³   ³   ³   ÃÄÄÄlibsqlite3-sys-1796329ec32fe20d
+³   ³   ³   ³   ÃÄÄÄlibsqlite3-sys-135cadb25e6bec77
+³   ³   ³   ³   ÃÄÄÄlibsqlite3-sys-77f42d257930446d
+³   ³   ³   ³   ÃÄÄÄpkg-config-3e67ae996f5d4ab8
+³   ³   ³   ³   ÃÄÄÄvcpkg-efed40ad735ffcfc
+³   ³   ³   ³   ÃÄÄÄserde_urlencoded-9c8abd8044a89b80
+³   ³   ³   ³   ÃÄÄÄryu-d642d5c971f92e9b
+³   ³   ³   ³   ÃÄÄÄsqlx-sqlite-22aebfe37cb4089c
+³   ³   ³   ³   ÃÄÄÄatoi-4bb31cd71af89710
+³   ³   ³   ³   ÃÄÄÄnum-traits-2b171b829f2062df
+³   ³   ³   ³   ÃÄÄÄflume-4d4a3684d82263b0
+³   ³   ³   ³   ÃÄÄÄspin-1770b07e98d5c565
+³   ³   ³   ³   ÃÄÄÄfutures-executor-e1f04202b11f5751
+³   ³   ³   ³   ÃÄÄÄlibsqlite3-sys-00139bf2ae07e123
+³   ³   ³   ³   ÃÄÄÄtauri-2df966201bd48177
+³   ³   ³   ³   ÃÄÄÄanyhow-a00e9488178bba05
+³   ³   ³   ³   ÃÄÄÄcookie-6da36e33d120faf8
+³   ³   ³   ³   ÃÄÄÄtime-f77911a7ce2b7d83
+³   ³   ³   ³   ÃÄÄÄderanged-cd0b4c1789d94e95
+³   ³   ³   ³   ÃÄÄÄpowerfmt-6df4206ac487d031
+³   ³   ³   ³   ÃÄÄÄnum-conv-f0a4dc1ea1e06461
+³   ³   ³   ³   ÃÄÄÄtime-core-7e90564c65f66b6a
+³   ³   ³   ³   ÃÄÄÄtime-macros-c6a3a6449ee14aac
+³   ³   ³   ³   ÃÄÄÄdirs-0804da3f8e1bc77d
+³   ³   ³   ³   ÃÄÄÄdirs-sys-30b8757e3a662123
+³   ³   ³   ³   ÃÄÄÄoption-ext-83b639e4bc53f7f0
+³   ³   ³   ³   ÃÄÄÄdunce-0eb190b610119a2c
+³   ³   ³   ³   ÃÄÄÄgetrandom-5162a239ec5fa08c
+³   ³   ³   ³   ÃÄÄÄglob-8caa84a43fb6d7b4
+³   ³   ³   ³   ÃÄÄÄheck-3066a210fec014ec
+³   ³   ³   ³   ÃÄÄÄmuda-a1cdf387073304c2
+³   ³   ³   ³   ÃÄÄÄcrossbeam-channel-079ccfd857dac088
+³   ³   ³   ³   ÃÄÄÄdpi-8841d171fe569cb2
+³   ³   ³   ³   ÃÄÄÄkeyboard-types-2c0d25bbe0e456c7
+³   ³   ³   ³   ÃÄÄÄunicode-segmentation-f2ff6475fe360d86
+³   ³   ³   ³   ÃÄÄÄraw-window-handle-22ab43a2be811957
+³   ³   ³   ³   ÃÄÄÄserde_repr-36ed6080d82f17a5
+³   ³   ³   ³   ÃÄÄÄserialize-to-javascript-9bef26065f8f21e1
+³   ³   ³   ³   ÃÄÄÄserialize-to-javascript-impl-a27283a465ef9952
+³   ³   ³   ³   ÃÄÄÄtauri-macros-b2291dffbb5ddbc4
+³   ³   ³   ³   ÃÄÄÄtauri-codegen-6100723cd1f9babd
+³   ³   ³   ³   ÃÄÄÄico-3e3e55cdecbddcff
+³   ³   ³   ³   ÃÄÄÄpng-2801ce3b118f95ab
+³   ³   ³   ³   ÃÄÄÄcrc32fast-f08e0ced8c2298d3
+³   ³   ³   ³   ÃÄÄÄflate2-ec326e91ceb16f57
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-d40b50f988fc0510
+³   ³   ³   ³   ÃÄÄÄtauri-utils-0d7245f93062f89e
+³   ³   ³   ³   ÃÄÄÄbrotli-4707369c11712a53
+³   ³   ³   ³   ÃÄÄÄalloc-no-stdlib-a70791b9751e1f31
+³   ³   ³   ³   ÃÄÄÄalloc-stdlib-8a750290edba81e9
+³   ³   ³   ³   ÃÄÄÄbrotli-decompressor-adcdee24fc9348ee
+³   ³   ³   ³   ÃÄÄÄctor-f45c9fbaffc0c338
+³   ³   ³   ³   ÃÄÄÄinfer-c606435486557da9
+³   ³   ³   ³   ÃÄÄÄcfb-d11497724093b3a2
+³   ³   ³   ³   ÃÄÄÄbyteorder-4f2bf0fa23c320bf
+³   ³   ³   ³   ÃÄÄÄuuid-0f314c58e2146459
+³   ³   ³   ³   ÃÄÄÄgetrandom-ce88f657d1bda879
+³   ³   ³   ³   ÃÄÄÄjson-patch-772840b551fdcef7
+³   ³   ³   ³   ÃÄÄÄjsonptr-9902a46fe74aa412
+³   ³   ³   ³   ÃÄÄÄthiserror-700076fddc21055c
+³   ³   ³   ³   ÃÄÄÄphf-d93ac817177216d8
+³   ³   ³   ³   ÃÄÄÄphf_shared-db767369bfe39b11
+³   ³   ³   ³   ÃÄÄÄsiphasher-0758673c61d0e4bb
+³   ³   ³   ³   ÃÄÄÄplist-ddc754bef3ce9dd7
+³   ³   ³   ³   ÃÄÄÄquick-xml-58602222f0b30873
+³   ³   ³   ³   ÃÄÄÄregex-ec418d831d636e9d
+³   ³   ³   ³   ÃÄÄÄaho-corasick-326a0284fd2c658f
+³   ³   ³   ³   ÃÄÄÄregex-automata-94c32844cef650f7
+³   ³   ³   ³   ÃÄÄÄregex-syntax-2fe451e160fc0039
+³   ³   ³   ³   ÃÄÄÄsemver-b4cee531a3854c58
+³   ³   ³   ³   ÃÄÄÄserde-untagged-57e23929c15fd77a
+³   ³   ³   ³   ÃÄÄÄerased-serde-0ce2d3bbdb98023d
+³   ³   ³   ³   ÃÄÄÄtypeid-dd024ba41842b12e
+³   ³   ³   ³   ÃÄÄÄserde_with-31103da7fd2e1c73
+³   ³   ³   ³   ÃÄÄÄtoml-9d38d9ccd76a8e14
+³   ³   ³   ³   ÃÄÄÄserde_spanned-25e43ea539c1be3e
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-54d64e3fc9bb8084
+³   ³   ³   ³   ÃÄÄÄtoml_parser-095b4e8dc7b0d9a5
+³   ³   ³   ³   ÃÄÄÄwinnow-1eda90782d70f76b
+³   ³   ³   ³   ÃÄÄÄtoml_writer-c1c65e5c2788d6e7
+³   ³   ³   ³   ÃÄÄÄurlpattern-bb378bd7dfb7cb47
+³   ³   ³   ³   ÃÄÄÄunic-ucd-ident-bd8b7c475fbb9304
+³   ³   ³   ³   ÃÄÄÄunic-char-property-087354d8708c8c0d
+³   ³   ³   ³   ÃÄÄÄunic-char-range-8702919660c72b90
+³   ³   ³   ³   ÃÄÄÄunic-ucd-version-463cf7c2a4122661
+³   ³   ³   ³   ÃÄÄÄunic-common-697290b255fef125
+³   ³   ³   ³   ÃÄÄÄwalkdir-496e0ad979c5a936
+³   ³   ³   ³   ÃÄÄÄsame-file-a5371a8481180b86
+³   ³   ³   ³   ÃÄÄÄwinapi-util-054790fccfa65f41
+³   ³   ³   ³   ÃÄÄÄwebview2-com-4b143083b6e7ca00
+³   ³   ³   ³   ÃÄÄÄwebview2-com-macros-02080eb61cd91111
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-8f1ad600a35e728b
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-5f1dd782a49c1fb1
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-ea0824896c3e6a25
+³   ³   ³   ³   ÃÄÄÄwindows-bcab3211a6d77dac
+³   ³   ³   ³   ÃÄÄÄwindows-collections-8c48f51e3b3da3a9
+³   ³   ³   ³   ÃÄÄÄwindows-core-92ffc9e32a6bfa77
+³   ³   ³   ³   ÃÄÄÄwindows-implement-8f3b8d83bcf7900d
+³   ³   ³   ³   ÃÄÄÄwindows-interface-d8b90f255e9d0a3f
+³   ³   ³   ³   ÃÄÄÄwindows-link-20887d6a9c230430
+³   ³   ³   ³   ÃÄÄÄwindows-result-818af7e534cb1f5a
+³   ³   ³   ³   ÃÄÄÄwindows-strings-1833d87995fe69e1
+³   ³   ³   ³   ÃÄÄÄwindows-future-971da084278ab8f8
+³   ³   ³   ³   ÃÄÄÄwindows-threading-384b45b6cb511e36
+³   ³   ³   ³   ÃÄÄÄwindows-numerics-7988b73015b9593f
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-wry-ff4b940422dc39c0
+³   ³   ³   ³   ÃÄÄÄsoftbuffer-e7809722c325c59e
+³   ³   ³   ³   ÃÄÄÄtao-2c828df1a3fd3f5d
+³   ³   ³   ³   ÃÄÄÄwindows-version-74f756d09b84e1bf
+³   ³   ³   ³   ÃÄÄÄwry-1df237371a8e1abd
+³   ³   ³   ³   ÃÄÄÄwindow-vibrancy-4cf296fa9bc958f1
+³   ³   ³   ³   ÃÄÄÄwindows-sys-88fe9959e22e3783
+³   ³   ³   ³   ÃÄÄÄwindows-targets-feb0185103ed2597
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-0eab875a340cafdc
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-38e71849eb54bde6
+³   ³   ³   ³   ÃÄÄÄopen-530cbfc644b71c45
+³   ³   ³   ³   ÃÄÄÄtiktoken-rs-c4c0ea5f80a06825
+³   ³   ³   ³   ÃÄÄÄbase64-b0da0ddb92306524
+³   ³   ³   ³   ÃÄÄÄbstr-b1f808468d5ff335
+³   ³   ³   ³   ÃÄÄÄfancy-regex-f185f72417cd457c
+³   ³   ³   ³   ÃÄÄÄbit-set-59afd59f74f9c2de
+³   ³   ³   ³   ÃÄÄÄbit-vec-73e591bb55144c03
+³   ³   ³   ³   ÃÄÄÄlazy_static-38837c81b0533351
+³   ³   ³   ³   ÃÄÄÄrustc-hash-c39a23d2e8dccb09
+³   ³   ³   ³   ÃÄÄÄaizavr-ffc45f4b41888dd2
+³   ³   ³   ³   ÃÄÄÄaizavr-12022de58e90b754
+³   ³   ³   ³   ÃÄÄÄaizavr-19b2adf16b1bf372
+³   ³   ³   ³   ÃÄÄÄaizavr-9d52170758b1bfec
+³   ³   ³   ³   ÃÄÄÄasync-trait-63ca9046bb369f78
+³   ³   ³   ³   ÃÄÄÄaizavr-5242fcf4e20fe576
+³   ³   ³   ³   ÃÄÄÄaizavr-2059b60cc9e590b2
+³   ³   ³   ³   ÃÄÄÄaizavr-5ef51164df097b14
+³   ³   ³   ³   ÃÄÄÄtauri-build-974cd6198970eea9
+³   ³   ³   ³   ÃÄÄÄcargo_toml-dc94a6ca360150a8
+³   ³   ³   ³   ÃÄÄÄserde-3cb2f634754a498d
+³   ³   ³   ³   ÃÄÄÄtoml-195344bee42b777b
+³   ³   ³   ³   ÃÄÄÄserde_spanned-ab5328841ed45a8e
+³   ³   ³   ³   ÃÄÄÄdirs-b5d2e86528aecdbd
+³   ³   ³   ³   ÃÄÄÄdirs-sys-1cb208eb0221389f
+³   ³   ³   ³   ÃÄÄÄwindows-sys-5ce9878475d1d2f8
+³   ³   ³   ³   ÃÄÄÄjson-patch-73bd0b992e20937e
+³   ³   ³   ³   ÃÄÄÄjsonptr-7e659c3317b3fe5c
+³   ³   ³   ³   ÃÄÄÄserde_json-fe7726bfa745d14f
+³   ³   ³   ³   ÃÄÄÄthiserror-0a2beb6e4ff259d6
+³   ³   ³   ³   ÃÄÄÄschemars-4c046d1adeb6c2a4
+³   ³   ³   ³   ÃÄÄÄindexmap-883370526ee093bd
+³   ³   ³   ³   ÃÄÄÄurl-4c8a41ef88219f91
+³   ³   ³   ³   ÃÄÄÄform_urlencoded-f56a3cd6753b58f7
+³   ³   ³   ³   ÃÄÄÄidna-eca326d094e79d09
+³   ³   ³   ³   ÃÄÄÄidna_adapter-0f1fc61577f486c5
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-08ffc2f059bc9133
+³   ³   ³   ³   ÃÄÄÄicu_collections-3b6d4ad68c77c002
+³   ³   ³   ³   ÃÄÄÄpotential_utf-454a77c40b31e0ae
+³   ³   ³   ³   ÃÄÄÄzerovec-2bb75e45fa54a74a
+³   ³   ³   ³   ÃÄÄÄyoke-b654f1575898f04c
+³   ³   ³   ³   ÃÄÄÄzerofrom-15ffec05e6462077
+³   ³   ³   ³   ÃÄÄÄicu_provider-6802247b22ea2c01
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-4132a706d4cbd1b3
+³   ³   ³   ³   ÃÄÄÄtinystr-96a905dec5d198b0
+³   ³   ³   ³   ÃÄÄÄzerotrie-11bf51cb622594fb
+³   ³   ³   ³   ÃÄÄÄicu_properties-321d3ca33d435605
+³   ³   ³   ³   ÃÄÄÄuuid-d0205c2df9d43ac2
+³   ³   ³   ³   ÃÄÄÄgetrandom-e90ead6a93c8863e
+³   ³   ³   ³   ÃÄÄÄtauri-utils-7eb60256f584c47b
+³   ³   ³   ³   ÃÄÄÄcargo_metadata-cdf287ce0a8a6c48
+³   ³   ³   ³   ÃÄÄÄcargo-platform-6fc62baa4b78af71
+³   ³   ³   ³   ÃÄÄÄthiserror-18f720915db63bbd
+³   ³   ³   ³   ÃÄÄÄdom_query-208ccba0224f59cc
+³   ³   ³   ³   ÃÄÄÄcssparser-f1049e15b201200d
+³   ³   ³   ³   ÃÄÄÄphf-9912161e8f935806
+³   ³   ³   ³   ÃÄÄÄphf_macros-9d965563711da29d
+³   ³   ³   ³   ÃÄÄÄhtml5ever-80717e0eca46141e
+³   ³   ³   ³   ÃÄÄÄmarkup5ever-c2d82d6855428e39
+³   ³   ³   ³   ÃÄÄÄweb_atoms-a5dccbea5fac86ea
+³   ³   ³   ³   ÃÄÄÄstring_cache-1aff88ac487ded23
+³   ³   ³   ³   ÃÄÄÄparking_lot-192d740573d14fc2
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-9551ed705df7587b
+³   ³   ³   ³   ÃÄÄÄselectors-17f22897563af1cf
+³   ³   ³   ³   ÃÄÄÄinfer-fa29542dface3230
+³   ³   ³   ³   ÃÄÄÄcfb-cfb01eab4c623819
+³   ³   ³   ³   ÃÄÄÄplist-3ba1854bcd16dbce
+³   ³   ³   ³   ÃÄÄÄregex-e022f771b9d50d9e
+³   ³   ³   ³   ÃÄÄÄregex-automata-65109201aee7bc87
+³   ³   ³   ³   ÃÄÄÄserde-untagged-76204211f1bf064e
+³   ³   ³   ³   ÃÄÄÄerased-serde-dad3e2de1f9aa91f
+³   ³   ³   ³   ÃÄÄÄserde_with-31f92a26d0971857
+³   ³   ³   ³   ÃÄÄÄtoml-7b6758e53580dec2
+³   ³   ³   ³   ÃÄÄÄtoml_datetime-35f80d31c386d182
+³   ³   ³   ³   ÃÄÄÄurlpattern-33b4e879370d40b3
+³   ³   ³   ³   ÃÄÄÄwalkdir-5f1acda3fc138199
+³   ³   ³   ³   ÃÄÄÄsame-file-4ee34c21141d73fd
+³   ³   ³   ³   ÃÄÄÄwinapi-util-4dd9a9ca26aece2f
+³   ³   ³   ³   ÃÄÄÄtauri-winres-56a8e93cb8d18e0e
+³   ³   ³   ³   ÃÄÄÄembed-resource-3977e5b7179abc62
+³   ³   ³   ³   ÃÄÄÄtauri-7986173f06b58999
+³   ³   ³   ³   ÃÄÄÄtauri-e69914bcecd7a2b4
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-8dbc236ca05435ad
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-fe3be19f0e556a5e
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-c08a2f7ae8a0bdaf
+³   ³   ³   ³   ÃÄÄÄkeyring-b5d4733b03e53c72
+³   ³   ³   ³   ÃÄÄÄzeroize-455fad8eb4d3b216
+³   ³   ³   ³   ÃÄÄÄreqwest-918f57512483d7f9
+³   ³   ³   ³   ÃÄÄÄencoding_rs-6668f9a3bfbb9061
+³   ³   ³   ³   ÃÄÄÄfutures-core-4fcb200a4b6ba7b0
+³   ³   ³   ³   ÃÄÄÄfutures-util-7487222954464bd5
+³   ³   ³   ³   ÃÄÄÄfutures-io-118d68d77e0345ae
+³   ³   ³   ³   ÃÄÄÄfutures-sink-3585f6e909057380
+³   ³   ³   ³   ÃÄÄÄfutures-task-9c1f78003b86388f
+³   ³   ³   ³   ÃÄÄÄslab-c54587d90acfdd62
+³   ³   ³   ³   ÃÄÄÄh2-88fbcfe9bbf74618
+³   ³   ³   ³   ÃÄÄÄatomic-waker-a63bfe5478bbd105
+³   ³   ³   ³   ÃÄÄÄtokio-ebc77d8594e38a1c
+³   ³   ³   ³   ÃÄÄÄmio-7ce6315971d4a2e6
+³   ³   ³   ³   ÃÄÄÄwindows-sys-f56ec81638f59a33
+³   ³   ³   ³   ÃÄÄÄparking_lot-d4acb0d556fe6e55
+³   ³   ³   ³   ÃÄÄÄparking_lot_core-69d260337b0ac6c7
+³   ³   ³   ³   ÃÄÄÄsmallvec-50a66600b2d2177b
+³   ³   ³   ³   ÃÄÄÄsocket2-4ee97ea36e21ee92
+³   ³   ³   ³   ÃÄÄÄtokio-util-ecdc219626f2602c
+³   ³   ³   ³   ÃÄÄÄtracing-b28a161d4c62f425
+³   ³   ³   ³   ÃÄÄÄtracing-core-556801fa8edcbf03
+³   ³   ³   ³   ÃÄÄÄhttp-body-3c3edcd54d5be328
+³   ³   ³   ³   ÃÄÄÄhttp-body-util-08f6d9671658c402
+³   ³   ³   ³   ÃÄÄÄhyper-73bbae299d5f40e0
+³   ³   ³   ³   ÃÄÄÄfutures-channel-0a1b3b19d0d86a18
+³   ³   ³   ³   ÃÄÄÄhttparse-7ca13416f5fd0f0e
+³   ³   ³   ³   ÃÄÄÄwant-ec73f91f5af7d404
+³   ³   ³   ³   ÃÄÄÄtry-lock-275b5e8e17894b19
+³   ³   ³   ³   ÃÄÄÄhyper-tls-9a2077617658e43d
+³   ³   ³   ³   ÃÄÄÄhyper-util-4aa6289f4840a2fb
+³   ³   ³   ³   ÃÄÄÄipnet-dea9cc84ab6ce748
+³   ³   ³   ³   ÃÄÄÄtower-service-3d89b48e7529514a
+³   ³   ³   ³   ÃÄÄÄwindows-registry-3f616270143b5fd1
+³   ³   ³   ³   ÃÄÄÄwindows-result-5d464b800e498903
+³   ³   ³   ³   ÃÄÄÄwindows-strings-6c06bdbe82030cd2
+³   ³   ³   ³   ÃÄÄÄnative-tls-bf559e31a2735bf1
+³   ³   ³   ³   ÃÄÄÄschannel-ece9a09bc7306576
+³   ³   ³   ³   ÃÄÄÄtokio-native-tls-49af33d945f0d523
+³   ³   ³   ³   ÃÄÄÄrustls-pki-types-6931c068445013f9
+³   ³   ³   ³   ÃÄÄÄserde-1300215380ac9fef
+³   ³   ³   ³   ÃÄÄÄserde_urlencoded-df6770116c03a556
+³   ³   ³   ³   ÃÄÄÄryu-e66e2e84528ce1f6
+³   ³   ³   ³   ÃÄÄÄsync_wrapper-2e963b8920ea93cc
+³   ³   ³   ³   ÃÄÄÄtower-41916b29d00adbba
+³   ³   ³   ³   ÃÄÄÄtower-layer-b9c1d30a49fec744
+³   ³   ³   ³   ÃÄÄÄtower-http-3179e590bb684fd6
+³   ³   ³   ³   ÃÄÄÄurl-e0ccd41d9911bf90
+³   ³   ³   ³   ÃÄÄÄidna-ab9374bde6ee4c6e
+³   ³   ³   ³   ÃÄÄÄidna_adapter-412407e9a550411d
+³   ³   ³   ³   ÃÄÄÄicu_normalizer-a2f937de25572cc1
+³   ³   ³   ³   ÃÄÄÄicu_collections-504f056df5141fa6
+³   ³   ³   ³   ÃÄÄÄpotential_utf-c7aeec0fedc3bf17
+³   ³   ³   ³   ÃÄÄÄzerovec-59439d5a2ba8a76c
+³   ³   ³   ³   ÃÄÄÄyoke-f61111b5e32beffd
+³   ³   ³   ³   ÃÄÄÄicu_provider-ef32d3cedcf224fe
+³   ³   ³   ³   ÃÄÄÄicu_locale_core-b261d6391b219fca
+³   ³   ³   ³   ÃÄÄÄtinystr-d0e6198f32dda032
+³   ³   ³   ³   ÃÄÄÄzerotrie-929585592d3df6b4
+³   ³   ³   ³   ÃÄÄÄicu_properties-76190259b4a7e4fc
+³   ³   ³   ³   ÃÄÄÄsqlx-73b3d5036f351049
+³   ³   ³   ³   ÃÄÄÄsqlx-core-5d79225303ecbae6
+³   ³   ³   ³   ÃÄÄÄcrc-bf32bc8912655079
+³   ³   ³   ³   ÃÄÄÄcrc-catalog-3fc97d336c378f90
+³   ³   ³   ³   ÃÄÄÄcrossbeam-queue-fe1936fc4d7c1544
+³   ³   ³   ³   ÃÄÄÄeither-24383884a7e69e9b
+³   ³   ³   ³   ÃÄÄÄevent-listener-fad465a298cd79ed
+³   ³   ³   ³   ÃÄÄÄconcurrent-queue-c441731d28dd1257
+³   ³   ³   ³   ÃÄÄÄparking-7f133a8ea2480594
+³   ³   ³   ³   ÃÄÄÄfutures-intrusive-911144bf70dbaf8b
+³   ³   ³   ³   ÃÄÄÄhashbrown-b7ea92f191da9429
+³   ³   ³   ³   ÃÄÄÄallocator-api2-2a8f64255b7efe9c
+³   ³   ³   ³   ÃÄÄÄfoldhash-e0e750b5d57e29ec
+³   ³   ³   ³   ÃÄÄÄhashlink-784b5bd94733975e
+³   ³   ³   ³   ÃÄÄÄsha2-7e6e3dafe7e30e87
+³   ³   ³   ³   ÃÄÄÄcpufeatures-4d496b483da4b1a1
+³   ³   ³   ³   ÃÄÄÄdigest-e27169ad29bf1d75
+³   ³   ³   ³   ÃÄÄÄblock-buffer-79c3cbccb2d3574f
+³   ³   ³   ³   ÃÄÄÄgeneric-array-3e4a3eca1ffab09a
+³   ³   ³   ³   ÃÄÄÄtypenum-a4fa7814b0cb2834
+³   ³   ³   ³   ÃÄÄÄcrypto-common-179487d19f1d0801
+³   ³   ³   ³   ÃÄÄÄtokio-stream-25d98209088ed296
+³   ³   ³   ³   ÃÄÄÄsqlx-macros-53874e07f11dec22
+³   ³   ³   ³   ÃÄÄÄsqlx-core-cd821c157a045683
+³   ³   ³   ³   ÃÄÄÄeither-c8b2944533ca8d41
+³   ³   ³   ³   ÃÄÄÄfutures-intrusive-b43170b167564962
+³   ³   ³   ³   ÃÄÄÄfutures-util-1311de12856964d0
+³   ³   ³   ³   ÃÄÄÄsha2-cae89796d530b9db
+³   ³   ³   ³   ÃÄÄÄdigest-171fb8c744167e08
+³   ³   ³   ³   ÃÄÄÄcrypto-common-65fe9871cfe9ae0f
+³   ³   ³   ³   ÃÄÄÄtokio-bdad8989932e3754
+³   ³   ³   ³   ÃÄÄÄmio-e5d5946536eea166
+³   ³   ³   ³   ÃÄÄÄsocket2-47aa62db7ae61687
+³   ³   ³   ³   ÃÄÄÄtokio-stream-6edc4d13a3c9d754
+³   ³   ³   ³   ÃÄÄÄsqlx-macros-core-b9fad732ec102029
+³   ³   ³   ³   ÃÄÄÄsqlx-sqlite-8763d7f57ffd0377
+³   ³   ³   ³   ÃÄÄÄatoi-2fbe13d0da7addd9
+³   ³   ³   ³   ÃÄÄÄnum-traits-1b8e2cd3cd0da2f4
+³   ³   ³   ³   ÃÄÄÄflume-e7064e092db1d640
+³   ³   ³   ³   ÃÄÄÄspin-85adc7f3f47ec1c6
+³   ³   ³   ³   ÃÄÄÄfutures-channel-a31597475deffd4a
+³   ³   ³   ³   ÃÄÄÄfutures-executor-515a2bbcf93291a7
+³   ³   ³   ³   ÃÄÄÄlibsqlite3-sys-36e3e84dd0b0cb7d
+³   ³   ³   ³   ÃÄÄÄserde_urlencoded-5230068f5b5966a7
+³   ³   ³   ³   ÃÄÄÄsqlx-sqlite-2d493fe345dd9651
+³   ³   ³   ³   ÃÄÄÄflume-c9588c33e1ff1d11
+³   ³   ³   ³   ÃÄÄÄfutures-executor-ff85e033f3b9239a
+³   ³   ³   ³   ÃÄÄÄtauri-ed7b7bbf3e593b89
+³   ³   ³   ³   ÃÄÄÄdirs-3f08ea08169f733d
+³   ³   ³   ³   ÃÄÄÄdirs-sys-737461ccdade55cd
+³   ³   ³   ³   ÃÄÄÄmuda-bf0595d2e1426812
+³   ³   ³   ³   ÃÄÄÄdpi-065bd4718b97da88
+³   ³   ³   ³   ÃÄÄÄkeyboard-types-f64f5d7f630ce56d
+³   ³   ³   ³   ÃÄÄÄserialize-to-javascript-3a6d60d235befd3a
+³   ³   ³   ³   ÃÄÄÄtauri-macros-72a82241d02be565
+³   ³   ³   ³   ÃÄÄÄtauri-codegen-c668b75fe2c65ac1
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-76c3244229cd4204
+³   ³   ³   ³   ÃÄÄÄtauri-utils-71394988d4c1fac1
+³   ³   ³   ³   ÃÄÄÄinfer-ae5bf221cd968fff
+³   ³   ³   ³   ÃÄÄÄcfb-d98e5851a7f0cb78
+³   ³   ³   ³   ÃÄÄÄuuid-716810e9271cd9f7
+³   ³   ³   ³   ÃÄÄÄjson-patch-fa9aa8122f21f1cd
+³   ³   ³   ³   ÃÄÄÄjsonptr-6f19ba1ba75fc517
+³   ³   ³   ³   ÃÄÄÄphf-85285b6dda726863
+³   ³   ³   ³   ÃÄÄÄplist-23b9e9687d7c3487
+³   ³   ³   ³   ÃÄÄÄregex-335f7ebcd8fe7b68
+³   ³   ³   ³   ÃÄÄÄregex-automata-62ec03c67639f0ea
+³   ³   ³   ³   ÃÄÄÄserde_with-ac22e423c1250a2c
+³   ³   ³   ³   ÃÄÄÄurlpattern-7d9ff75d1991486d
+³   ³   ³   ³   ÃÄÄÄwalkdir-365d532ad32b6f84
+³   ³   ³   ³   ÃÄÄÄsame-file-40735cc0eeb1864b
+³   ³   ³   ³   ÃÄÄÄwinapi-util-d692d2c51dba748b
+³   ³   ³   ³   ÃÄÄÄwebview2-com-c0ec0473903dca5e
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-37bddc1fe0e92558
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-425b0fa88d8c7d53
+³   ³   ³   ³   ÃÄÄÄwebview2-com-sys-19ffa71c71024e8d
+³   ³   ³   ³   ÃÄÄÄwindows-dc36586f254462ac
+³   ³   ³   ³   ÃÄÄÄwindows-collections-a6073e8c6d674e8a
+³   ³   ³   ³   ÃÄÄÄwindows-core-371eff80b4dec88f
+³   ³   ³   ³   ÃÄÄÄwindows-future-3b31deed19641a63
+³   ³   ³   ³   ÃÄÄÄwindows-numerics-fe5ebf13058564e7
+³   ³   ³   ³   ÃÄÄÄtauri-runtime-wry-deefa05c5fdb0ea0
+³   ³   ³   ³   ÃÄÄÄsoftbuffer-e2d9b04fd27a0516
+³   ³   ³   ³   ÃÄÄÄtao-ba954a656575a3da
+³   ³   ³   ³   ÃÄÄÄwry-504f7c37c1297406
+³   ³   ³   ³   ÃÄÄÄtauri-plugin-opener-c07b14e32792a8ca
+³   ³   ³   ³   ÃÄÄÄtiktoken-rs-60e30f57edda070b
+³   ³   ³   ³   ÃÄÄÄbase64-42acaaa86c653d4a
+³   ³   ³   ³   ÃÄÄÄbstr-deee16d0812d4f08
+³   ³   ³   ³   ÃÄÄÄfancy-regex-fedb966cb4986dc6
+³   ³   ³   ³   ÃÄÄÄbit-set-fc2d321645039b9f
+³   ³   ³   ³   ÃÄÄÄbit-vec-e101867614be670d
+³   ³   ³   ³   ÃÄÄÄlazy_static-efb5120646cb6465
+³   ³   ³   ³   ÃÄÄÄrustc-hash-821af7a482a93df2
+³   ³   ³   ³   ÃÄÄÄaizavr-32f67ec8da592c13
+³   ³   ³   ³   ÃÄÄÄaizavr-53f06b29788d775d
+³   ³   ³   ³   ÃÄÄÄaizavr-da91c2780525f942
+³   ³   ³   ³   ÃÄÄÄkeyring-e5276ae48e6da1af
+³   ³   ³   ³   ÃÄÄÄwindows-sys-66dafbf3d73a719a
+³   ³   ³   ³   ÃÄÄÄwindows-targets-05cf0a089bfb3678
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-15ac9f64297b7ffe
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-e925f74822633694
+³   ³   ³   ³   ÃÄÄÄwindows_x86_64_msvc-ad2aa6b1840fd81d
+³   ³   ³   ³   ÃÄÄÄaizavr-a7aa6e7a5ebd3766
+³   ³   ³   ³   ÃÄÄÄaizavr-399ee869510b06fd
+³   ³   ³   ³   ÃÄÄÄaizavr-a3b036a2e6e3ca0e
+³   ³   ³   ³   ÃÄÄÄkeyring-0b544eb2aeda7e64
+³   ³   ³   ³   ÃÄÄÄwindows-sys-0f58323f44619c65
+³   ³   ³   ³   ÃÄÄÄwindows-targets-11541c1387113afb
+³   ³   ³   ³   ÀÄÄÄwindows_x86_64_msvc-d7f0513d54c405a6
+³   ³   ³   ÃÄÄÄincremental
+³   ³   ³   ³   ÃÄÄÄbuild_script_build-3k7kxiisryov7
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4k1zq3xs-1rssp83-15esk7ronb30e9tyegvz3t2dd
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-16irg7jd3yn75
+³   ³   ³   ³   ³   ÃÄÄÄs-hj4k2dqbez-1anpm0g-55wk5un81bqfq90qh69urb1op
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4lfge334-0kyqwb7-55wk5un81bqfq90qh69urb1op
+³   ³   ³   ³   ÃÄÄÄaizavr-1c5tp84uhogqp
+³   ³   ³   ³   ³   ÃÄÄÄs-hj4k2vd1kb-1cq0spc-782ymo0gp9c41odo2s1smn1qk
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4lg3000y-1hev3mb-782ymo0gp9c41odo2s1smn1qk
+³   ³   ³   ³   ÃÄÄÄbuild_script_build-0nd2mwqxzigcq
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4ltiwjw8-1orr786-dtu8xxvdzu81u0tjcgtjc5z30
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-3n4tk72jq2la1
+³   ³   ³   ³   ³   ÃÄÄÄs-hj4n554wed-0amdc7m-0nxtcp6eivo72buwhq3b0tt55
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4rq0qdsm-0wxjc8t-36h0kl4f0ng8o1958ddb5w39m
+³   ³   ³   ³   ÃÄÄÄaizavr-3bor57xlxv16a
+³   ³   ³   ³   ³   ÃÄÄÄs-hj4n563m2u-1uortbt-2rv447dyedtrdy6s78gm2mu7x
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4rq1amxp-0y8yh0r-bs7n19muqecr09osp1cgb1u9b
+³   ³   ³   ³   ÃÄÄÄaizavr-2ydx8p80qn37s
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4mofe8dm-0ehy91y-8pazhy56uau8iwfm3l7jajwws
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-0tyki2vi8xpyz
+³   ³   ³   ³   ³   ÀÄÄÄs-hj4mofe8dw-1cg4z0q-47eakrpq7wr9x11eot5faoe0b
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-3ov2jw9n32x27
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5t6wa9xd-1jennjv-bqrbuofnssa0wunxqx3560n5s
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5to0qgsu-1hvpjme-ajp5fa7a3bw7f7wd2y1amjh83
+³   ³   ³   ³   ÃÄÄÄaizavr-1c3ax7jdjatca
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5t6xsswz-0q5g3z9-bvhif2g6noje8580pcs5lxlcc
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5to2f8un-1hbx0q0-9sn832r9edz376dhlmsgf80fb
+³   ³   ³   ³   ÃÄÄÄbuild_script_build-21o55g7aiiqvp
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5q37ecmj-19o8fn5-6q9piwqolmh1kr3evug7y2qlh
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-11bfs7mac07y6
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5tbdm91g-06qy11m-1aqjbg630n8m40mcem1tpha28
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5to7ea96-0p4lrni-efubq8p69b5dmgyxy1wd02ujr
+³   ³   ³   ³   ÃÄÄÄaizavr-0pja7e7gsguuy
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5tdmy7ya-1889n5u-3uvi1tn8qttjpztz5zojyojpi
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5tpumqqv-0v9njof-dd3pol0q8o4xczb08krhv8wgu
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-1ngrhkjt8lxy4
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5t6wa9xr-1mg2uhv-drh72tbwxlpmq48f1bg9yddks
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5to0qgt6-14jimrt-dijfdnd5m6w1osg2uuptabw9t
+³   ³   ³   ³   ÃÄÄÄaizavr-18cr8ae9g0f28
+³   ³   ³   ³   ³   ÃÄÄÄs-hj5t6xssx4-1ds2sb0-26ldravvwlaf5plybnig4g1ds
+³   ³   ³   ³   ³   ÀÄÄÄs-hj5to2f8u7-1nl0dd9-3qri3brcjsfq0lmqddewteac8
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-3e03nkt4zf3u8
+³   ³   ³   ³   ³   ÃÄÄÄs-hj6sw969ni-1f46unj-256w2vh79dnmj8br687ztha21
+³   ³   ³   ³   ³   ÀÄÄÄs-hja0jiim51-1pxng1m-30lw9d5rlxs5fnio3afcbk1ok
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-0qip04xj6wbz9
+³   ³   ³   ³   ³   ÃÄÄÄs-hj6sw99z4t-1h1zolo-ce5nuzff4mwrim4m2lfhc6xcj
+³   ³   ³   ³   ³   ÀÄÄÄs-hja0jiim4x-1vcmxtb-18298o5ftweyno9ik5wdknpsz
+³   ³   ³   ³   ÃÄÄÄaizavr-2jnu3vf43q5k8
+³   ³   ³   ³   ³   ÃÄÄÄs-hj6swb3fk9-1w1ao27-e03eeop7x810a98odxozv4slt
+³   ³   ³   ³   ³   ÀÄÄÄs-hja0k9edyf-1nofb6p-5bna2kk7y1uizc9zts0ozysxv
+³   ³   ³   ³   ÃÄÄÄaizavr-38waqc9sg9h9u
+³   ³   ³   ³   ³   ÃÄÄÄs-hj6swb3p8x-0nm7cni-28sii8uhw6wv888o29gzoytns
+³   ³   ³   ³   ³   ÀÄÄÄs-hja0k9ns8z-1pj2qjk-8pqnw189212r0hzv1lkt0iqs7
+³   ³   ³   ³   ÃÄÄÄaizavr_lib-0b9uzaafkivfe
+³   ³   ³   ³   ³   ÃÄÄÄs-hjiveyade9-18lq9nq-bhnxl9l2hi5p1tr4rk1hjyhlp
+³   ³   ³   ³   ³   ÀÄÄÄs-hjixlau3o5-02ihgoo-ajvrkxorgmkyuaermpksl9hpg
+³   ³   ³   ³   ÀÄÄÄaizavr-1bjgo3lzefpaw
+³   ³   ³   ³       ÃÄÄÄs-hjivhndlnt-16mh8jm-5dz7oct7ftwkbhlyzr541u111
+³   ³   ³   ³       ÀÄÄÄs-hjixmcvvz8-19m80vn-arm3sb3ijqegqgfjf0m680yw0
+³   ³   ³   ÀÄÄÄbuild
+³   ³   ³       ÃÄÄÄaizavr-fde0cce61911810c
+³   ³   ³       ÃÄÄÄaizavr-b360fe00ebd6cdf2
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄapp-manifest
+³   ³   ³       ÃÄÄÄanyhow-854be13ee807ceeb
+³   ³   ³       ÃÄÄÄanyhow-7292878aaa05da4c
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde-cdb2584a7192e2fc
+³   ³   ³       ÃÄÄÄserde-69dadcdd184ecf30
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde_core-73d152b7ceda14db
+³   ³   ³       ÃÄÄÄserde_core-2edbf5ce1d61934b
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄproc-macro2-f101e74d49154d97
+³   ³   ³       ÃÄÄÄproc-macro2-0089b8fc4861aeb0
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄquote-78c7521c3e232bbe
+³   ³   ³       ÃÄÄÄquote-ff2a90532af845aa
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde_json-553be65809f52a71
+³   ³   ³       ÃÄÄÄserde_json-c5169bc26a41dd4f
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄzmij-bbaef9d295c9b9a4
+³   ³   ³       ÃÄÄÄzmij-08aed8c3c171b8b1
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄthiserror-bd8ea4cc14d7a3c7
+³   ³   ³       ÃÄÄÄthiserror-295b8b286a75f786
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄindexmap-86c2f8fd8f75aa20
+³   ³   ³       ÃÄÄÄindexmap-f00f99b5dac879b6
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄschemars-f2bdbd922a10c26c
+³   ³   ³       ÃÄÄÄschemars-8db0b721eee5f877
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄicu_normalizer_data-96a52fd262d0f4c6
+³   ³   ³       ÃÄÄÄicu_normalizer_data-fcc13466500a304d
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄicu_properties_data-cd63a06a3e531c28
+³   ³   ³       ÃÄÄÄicu_properties_data-7b1353f86d4d36da
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄgetrandom-e9faf9724e08c3de
+³   ³   ³       ÃÄÄÄgetrandom-35e7bd5f7930b705
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄcamino-9443787eef558086
+³   ³   ³       ÃÄÄÄcamino-5c1c8693e6fcbf64
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄthiserror-f4d6322d70c52f5c
+³   ³   ³       ÃÄÄÄthiserror-e196c11b7df54c50
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄparking_lot_core-12fc7eb0299b59cc
+³   ³   ³       ÃÄÄÄparking_lot_core-e3e5c74a4f654ef3
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄweb_atoms-100a2f08464b0527
+³   ³   ³       ÃÄÄÄweb_atoms-327bfd391b0ca720
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄselectors-6d390b27f27f34b0
+³   ³   ³       ÃÄÄÄselectors-0f205fa6de5c7883
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄerased-serde-8f5f4ef94a9443e7
+³   ³   ³       ÃÄÄÄerased-serde-34a9c2f65112b32c
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄtypeid-d9b972aba2ca812e
+³   ³   ³       ÃÄÄÄtypeid-1e51bb5c9d8f5e68
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄlibc-763fb040b2d663ab
+³   ³   ³       ÃÄÄÄlibc-dd5b03e75856a267
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄvswhom-sys-e49c8b1e17454e50
+³   ³   ³       ÃÄÄÄvswhom-sys-6c35df59f53f60ab
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄwindows_x86_64_msvc-d70364700e1c05c8
+³   ³   ³       ÃÄÄÄwindows_x86_64_msvc-b76b1035c894b0c1
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄtauri-39045cd82f3a736a
+³   ³   ³       ÃÄÄÄtauri-4c5fc9c73f6fe7c0
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄpermissions
+³   ³   ³       ³           ÃÄÄÄpath
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄevent
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwindow
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwebview
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄapp
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄimage
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄresources
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄmenu
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÀÄÄÄtray
+³   ³   ³       ³               ÀÄÄÄautogenerated
+³   ³   ³       ³                   ÀÄÄÄcommands
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-ac303db40dbaefa2
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-264ecdae434a2914
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde-b4e8599ad30d0584
+³   ³   ³       ÃÄÄÄserde-51226174b1e49143
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde_core-fdf5f60f2a35bbe7
+³   ³   ³       ÃÄÄÄserde_core-35ba2c05936e7c77
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde_json-32914949b4053350
+³   ³   ³       ÃÄÄÄserde_json-9d2f8d5283adfa3f
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄcookie-ba0d0f95d27dc253
+³   ³   ³       ÃÄÄÄcookie-72e6612ab0930e5f
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄgetrandom-ed1f94bceed784af
+³   ³   ³       ÃÄÄÄgetrandom-40d34049b695ef5f
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄcrossbeam-utils-8066693d49c7288a
+³   ³   ³       ÃÄÄÄcrossbeam-utils-8ba130f70681044d
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄcrc32fast-1c041f34d42edac0
+³   ³   ³       ÃÄÄÄcrc32fast-7988aeb7d7c85e24
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄgeneric-array-91b16dd255e0db51
+³   ³   ³       ÃÄÄÄgeneric-array-5ec5ee46430be4f3
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄtauri-runtime-6253ec0457216c42
+³   ³   ³       ÃÄÄÄtauri-runtime-c1caf11ada0633ea
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄwebview2-com-sys-60d56c135baf87e8
+³   ³   ³       ÃÄÄÄwebview2-com-sys-c5d39ecf43b9d019
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÃÄÄÄarm64
+³   ³   ³       ³       ÃÄÄÄx64
+³   ³   ³       ³       ÀÄÄÄx86
+³   ³   ³       ÃÄÄÄtauri-runtime-wry-52428c4b1c675e16
+³   ³   ³       ÃÄÄÄtauri-runtime-wry-cb0d89f5b26c54cd
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄwry-8d1ecc6b8379e6a6
+³   ³   ³       ÃÄÄÄwry-3fa6c6b38befdde5
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄaizavr-6e4a43cf38770060
+³   ³   ³       ÃÄÄÄaizavr-bbad05a95bb6ae62
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄapp-manifest
+³   ³   ³       ÃÄÄÄserde_core-316d7a7cca449a97
+³   ³   ³       ÃÄÄÄserde_core-4fc4882f15e7293d
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄserde_json-d5a23e5b046e18d2
+³   ³   ³       ÃÄÄÄserde_json-e6fcd8ef18bc5d59
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄgetrandom-28f04a6bba61f62d
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄweb_atoms-03fa3c46c9c11648
+³   ³   ³       ÃÄÄÄweb_atoms-b1c40434e587fe86
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄselectors-e0e969aaed29c8ca
+³   ³   ³       ÃÄÄÄselectors-282703b58d40952c
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄtauri-8daf5be09bd60f29
+³   ³   ³       ÃÄÄÄtauri-666e40b7088a1b47
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄpermissions
+³   ³   ³       ³           ÃÄÄÄpath
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄevent
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwindow
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwebview
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄapp
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄimage
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄresources
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄmenu
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÀÄÄÄtray
+³   ³   ³       ³               ÀÄÄÄautogenerated
+³   ³   ³       ³                   ÀÄÄÄcommands
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-baa21016ebb962f5
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-79ba62b92daf9561
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄhttparse-4dc4630409fa7385
+³   ³   ³       ÃÄÄÄhttparse-2c652abd85dc21ee
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄnative-tls-33399c41462f9840
+³   ³   ³       ÃÄÄÄnative-tls-10c45e54438ca551
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄgeneric-array-5ed0f37b26cdacc4
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄnum-traits-7471ce6e6595e59b
+³   ³   ³       ÃÄÄÄnum-traits-47fe1348175626be
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄlibsqlite3-sys-77f42d257930446d
+³   ³   ³       ÃÄÄÄlibsqlite3-sys-135cadb25e6bec77
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄwebview2-com-sys-ea0824896c3e6a25
+³   ³   ³       ÃÄÄÄwebview2-com-sys-5f1dd782a49c1fb1
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÃÄÄÄarm64
+³   ³   ³       ³       ÃÄÄÄx64
+³   ³   ³       ³       ÀÄÄÄx86
+³   ³   ³       ÃÄÄÄaizavr-5ef51164df097b14
+³   ³   ³       ÃÄÄÄaizavr-2059b60cc9e590b2
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄapp-manifest
+³   ³   ³       ÃÄÄÄtauri-e69914bcecd7a2b4
+³   ³   ³       ÃÄÄÄtauri-7986173f06b58999
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÀÄÄÄpermissions
+³   ³   ³       ³           ÃÄÄÄpath
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄevent
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwindow
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄwebview
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄapp
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄimage
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄresources
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÃÄÄÄmenu
+³   ³   ³       ³           ³   ÀÄÄÄautogenerated
+³   ³   ³       ³           ³       ÀÄÄÄcommands
+³   ³   ³       ³           ÀÄÄÄtray
+³   ³   ³       ³               ÀÄÄÄautogenerated
+³   ³   ³       ³                   ÀÄÄÄcommands
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-fe3be19f0e556a5e
+³   ³   ³       ÃÄÄÄtauri-plugin-opener-8dbc236ca05435ad
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ÃÄÄÄwebview2-com-sys-19ffa71c71024e8d
+³   ³   ³       ÃÄÄÄwebview2-com-sys-425b0fa88d8c7d53
+³   ³   ³       ³   ÀÄÄÄout
+³   ³   ³       ³       ÃÄÄÄarm64
+³   ³   ³       ³       ÃÄÄÄx64
+³   ³   ³       ³       ÀÄÄÄx86
+³   ³   ³       ÃÄÄÄwindows_x86_64_msvc-ad2aa6b1840fd81d
+³   ³   ³       ÀÄÄÄwindows_x86_64_msvc-e925f74822633694
+³   ³   ³           ÀÄÄÄout
+³   ³   ÀÄÄÄflycheck0
+³   ÃÄÄÄgen
+³   ³   ÀÄÄÄschemas
+³   ÀÄÄÄmigrations
+ÃÄÄÄ.vscode
+ÃÄÄÄsrc
+³   ÃÄÄÄassets
+³   ÀÄÄÄwidgets
+³       ÃÄÄÄhost
+³       ÀÄÄÄcontext-meter
+ÃÄÄÄpublic
+ÃÄÄÄnode_modules
+³   ÃÄÄÄ@tauri-apps
+³   ³   ÃÄÄÄcli-win32-x64-msvc
+³   ³   ÃÄÄÄplugin-opener
+³   ³   ³   ÀÄÄÄdist-js
+³   ³   ÃÄÄÄcli
+³   ³   ÀÄÄÄapi
+³   ³       ÃÄÄÄmenu
+³   ³       ÀÄÄÄexternal
+³   ³           ÀÄÄÄtslib
+³   ÃÄÄÄ@babel
+³   ³   ÃÄÄÄplugin-transform-react-jsx-self
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄplugin-transform-react-jsx-source
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄcode-frame
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄgenerator
+³   ³   ³   ÀÄÄÄlib
+³   ³   ³       ÃÄÄÄgenerators
+³   ³   ³       ÀÄÄÄnode
+³   ³   ÃÄÄÄhelper-module-transforms
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄtemplate
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelper-compilation-targets
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelpers
+³   ³   ³   ÀÄÄÄlib
+³   ³   ³       ÀÄÄÄhelpers
+³   ³   ÃÄÄÄtraverse
+³   ³   ³   ÀÄÄÄlib
+³   ³   ³       ÃÄÄÄpath
+³   ³   ³       ³   ÃÄÄÄinference
+³   ³   ³       ³   ÀÄÄÄlib
+³   ³   ³       ÀÄÄÄscope
+³   ³   ³           ÀÄÄÄlib
+³   ³   ÃÄÄÄparser
+³   ³   ³   ÃÄÄÄbin
+³   ³   ³   ÃÄÄÄlib
+³   ³   ³   ÀÄÄÄtypings
+³   ³   ÃÄÄÄtypes
+³   ³   ³   ÀÄÄÄlib
+³   ³   ³       ÃÄÄÄasserts
+³   ³   ³       ³   ÀÄÄÄgenerated
+³   ³   ³       ÃÄÄÄast-types
+³   ³   ³       ³   ÀÄÄÄgenerated
+³   ³   ³       ÃÄÄÄbuilders
+³   ³   ³       ³   ÃÄÄÄflow
+³   ³   ³       ³   ÃÄÄÄgenerated
+³   ³   ³       ³   ÃÄÄÄreact
+³   ³   ³       ³   ÀÄÄÄtypescript
+³   ³   ³       ÃÄÄÄclone
+³   ³   ³       ÃÄÄÄcomments
+³   ³   ³       ÃÄÄÄconstants
+³   ³   ³       ³   ÀÄÄÄgenerated
+³   ³   ³       ÃÄÄÄconverters
+³   ³   ³       ÃÄÄÄdefinitions
+³   ³   ³       ÃÄÄÄmodifications
+³   ³   ³       ³   ÃÄÄÄflow
+³   ³   ³       ³   ÀÄÄÄtypescript
+³   ³   ³       ÃÄÄÄretrievers
+³   ³   ³       ÃÄÄÄtraverse
+³   ³   ³       ÃÄÄÄutils
+³   ³   ³       ³   ÀÄÄÄreact
+³   ³   ³       ÀÄÄÄvalidators
+³   ³   ³           ÃÄÄÄgenerated
+³   ³   ³           ÀÄÄÄreact
+³   ³   ÃÄÄÄhelper-validator-identifier
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄcompat-data
+³   ³   ³   ÀÄÄÄdata
+³   ³   ÃÄÄÄhelper-validator-option
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelper-module-imports
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelper-plugin-utils
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelper-string-parser
+³   ³   ³   ÀÄÄÄlib
+³   ³   ÃÄÄÄhelper-globals
+³   ³   ³   ÀÄÄÄdata
+³   ³   ÀÄÄÄcore
+³   ³       ÃÄÄÄlib
+³   ³       ³   ÃÄÄÄconfig
+³   ³       ³   ³   ÃÄÄÄfiles
+³   ³       ³   ³   ÃÄÄÄhelpers
+³   ³       ³   ³   ÀÄÄÄvalidation
+³   ³       ³   ÃÄÄÄerrors
+³   ³       ³   ÃÄÄÄgensync-utils
+³   ³       ³   ÃÄÄÄparser
+³   ³       ³   ³   ÀÄÄÄutil
+³   ³       ³   ÃÄÄÄtools
+³   ³       ³   ÃÄÄÄtransformation
+³   ³       ³   ³   ÃÄÄÄfile
+³   ³       ³   ³   ÀÄÄÄutil
+³   ³       ³   ÀÄÄÄvendor
+³   ³       ÀÄÄÄsrc
+³   ³           ÃÄÄÄconfig
+³   ³           ³   ÀÄÄÄfiles
+³   ³           ÀÄÄÄtransformation
+³   ÃÄÄÄ@types
+³   ³   ÃÄÄÄbabel__core
+³   ³   ÃÄÄÄbabel__generator
+³   ³   ÃÄÄÄbabel__template
+³   ³   ÃÄÄÄbabel__traverse
+³   ³   ÃÄÄÄestree
+³   ³   ÃÄÄÄreact
+³   ³   ³   ÀÄÄÄts5.0
+³   ³   ÀÄÄÄreact-dom
+³   ³       ÀÄÄÄtest-utils
+³   ÃÄÄÄ@jridgewell
+³   ³   ÃÄÄÄgen-mapping
+³   ³   ³   ÃÄÄÄtypes
+³   ³   ³   ÃÄÄÄdist
+³   ³   ³   ³   ÀÄÄÄtypes
+³   ³   ³   ÀÄÄÄsrc
+³   ³   ÃÄÄÄtrace-mapping
+³   ³   ³   ÃÄÄÄtypes
+³   ³   ³   ÃÄÄÄdist
+³   ³   ³   ÀÄÄÄsrc
+³   ³   ÃÄÄÄsourcemap-codec
+³   ³   ³   ÃÄÄÄtypes
+³   ³   ³   ÃÄÄÄdist
+³   ³   ³   ÀÄÄÄsrc
+³   ³   ÃÄÄÄresolve-uri
+³   ³   ³   ÀÄÄÄdist
+³   ³   ³       ÀÄÄÄtypes
+³   ³   ÀÄÄÄremapping
+³   ³       ÃÄÄÄtypes
+³   ³       ÃÄÄÄdist
+³   ³       ÀÄÄÄsrc
+³   ÃÄÄÄ@rollup
+³   ³   ÃÄÄÄrollup-win32-x64-msvc
+³   ³   ÀÄÄÄrollup-win32-x64-gnu
+³   ÃÄÄÄ@vitejs
+³   ³   ÀÄÄÄplugin-react
+³   ³       ÀÄÄÄdist
+³   ÃÄÄÄvite
+³   ³   ÃÄÄÄdist
+³   ³   ³   ÃÄÄÄnode
+³   ³   ³   ³   ÀÄÄÄchunks
+³   ³   ³   ÀÄÄÄclient
+³   ³   ÃÄÄÄmisc
+³   ³   ÃÄÄÄbin
+³   ³   ÀÄÄÄtypes
+³   ³       ÀÄÄÄinternal
+³   ÃÄÄÄ@rolldown
+³   ³   ÀÄÄÄpluginutils
+³   ³       ÀÄÄÄdist
+³   ÃÄÄÄ@esbuild
+³   ³   ÀÄÄÄwin32-x64
+³   ÃÄÄÄreact
+³   ³   ÀÄÄÄcjs
+³   ÃÄÄÄreact-dom
+³   ³   ÀÄÄÄcjs
+³   ÃÄÄÄtypescript
+³   ³   ÃÄÄÄbin
+³   ³   ÀÄÄÄlib
+³   ³       ÃÄÄÄcs
+³   ³       ÃÄÄÄde
+³   ³       ÃÄÄÄes
+³   ³       ÃÄÄÄfr
+³   ³       ÃÄÄÄit
+³   ³       ÃÄÄÄja
+³   ³       ÃÄÄÄko
+³   ³       ÃÄÄÄpl
+³   ³       ÃÄÄÄpt-br
+³   ³       ÃÄÄÄru
+³   ³       ÃÄÄÄtr
+³   ³       ÃÄÄÄzh-cn
+³   ³       ÀÄÄÄzh-tw
+³   ÃÄÄÄcsstype
+³   ÃÄÄÄreact-refresh
+³   ³   ÀÄÄÄcjs
+³   ÃÄÄÄconvert-source-map
+³   ÃÄÄÄdebug
+³   ³   ÀÄÄÄsrc
+³   ÃÄÄÄjson5
+³   ³   ÃÄÄÄlib
+³   ³   ÀÄÄÄdist
+³   ÃÄÄÄgensync
+³   ³   ÀÄÄÄtest
+³   ÃÄÄÄsemver
+³   ³   ÀÄÄÄbin
+³   ÃÄÄÄpicocolors
+³   ÃÄÄÄjs-tokens
+³   ÃÄÄÄjsesc
+³   ³   ÃÄÄÄbin
+³   ³   ÀÄÄÄman
+³   ÃÄÄÄlru-cache
+³   ÃÄÄÄbrowserslist
+³   ÃÄÄÄbaseline-browser-mapping
+³   ³   ÀÄÄÄdist
+³   ÃÄÄÄcaniuse-lite
+³   ³   ÃÄÄÄdata
+³   ³   ³   ÃÄÄÄfeatures
+³   ³   ³   ÀÄÄÄregions
+³   ³   ÀÄÄÄdist
+³   ³       ÃÄÄÄunpacker
+³   ³       ÀÄÄÄlib
+³   ÃÄÄÄelectron-to-chromium
+³   ÃÄÄÄnode-releases
+³   ³   ÀÄÄÄdata
+³   ³       ÃÄÄÄprocessed
+³   ³       ÀÄÄÄrelease-schedule
+³   ÃÄÄÄms
+³   ÃÄÄÄyallist
+³   ÃÄÄÄscheduler
+³   ³   ÀÄÄÄcjs
+³   ÃÄÄÄupdate-browserslist-db
+³   ÃÄÄÄescalade
+³   ³   ÃÄÄÄdist
+³   ³   ÀÄÄÄsync
+³   ÃÄÄÄesbuild
+³   ³   ÃÄÄÄbin
+³   ³   ÀÄÄÄlib
+³   ÃÄÄÄfdir
+³   ³   ÀÄÄÄdist
+³   ÃÄÄÄpicomatch
+³   ³   ÀÄÄÄlib
+³   ÃÄÄÄpostcss
+³   ³   ÀÄÄÄlib
+³   ÃÄÄÄrollup
+³   ³   ÀÄÄÄdist
+³   ³       ÃÄÄÄbin
+³   ³       ÃÄÄÄshared
+³   ³       ÀÄÄÄes
+³   ³           ÀÄÄÄshared
+³   ÃÄÄÄtinyglobby
+³   ³   ÀÄÄÄdist
+³   ÃÄÄÄsource-map-js
+³   ³   ÀÄÄÄlib
+³   ÃÄÄÄnanoid
+³   ³   ÃÄÄÄasync
+³   ³   ÃÄÄÄnon-secure
+³   ³   ÃÄÄÄurl-alphabet
+³   ³   ÃÄÄÄbin
+³   ³   ÀÄÄÄ.claude
+³   ÃÄÄÄ.bin
+³   ÃÄÄÄ.vite-temp
+³   ÀÄÄÄ.vite
+³       ÀÄÄÄdeps
+ÀÄÄÄdocs

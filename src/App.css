@@ -646,3 +646,101 @@ h1 {
   resize: vertical;
   vertical-align: middle;
 }
+
+/* --- Виджет-панель --- */
+.app-shell { display: flex; height: 100vh; overflow: hidden; }
+.app-shell .container { flex: 1; min-width: 0; overflow-y: auto; }
+
+.widget-panel {
+  position: relative;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(0,0,0,0.1);
+  background: #fbfbfb;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.widget-panel-resizer {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  cursor: col-resize;
+}
+.widget-panel-head {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,0.1);
+}
+.widget-panel-head-spacer { flex: 1; }
+.widget-panel-head button {
+  background: none; border: none; color: #666; cursor: pointer;
+  font-size: 14px; padding: 2px 6px; border-radius: 4px; box-shadow: none;
+}
+.widget-panel-head button:hover { background: rgba(0,0,0,0.06); color: #0f0f0f; }
+.widget-panel-pin.is-pinned { color: #396cd8; }
+
+.widget-panel-body { overflow-y: auto; padding: 8px; }
+.widget-section { margin-bottom: 12px; }
+.widget-section-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: #888; margin-bottom: 6px;
+}
+
+/* свёрнутый рельс */
+.widget-rail {
+  flex-shrink: 0; width: 40px; border-left: 1px solid rgba(0,0,0,0.1);
+  background: #fbfbfb; display: flex; flex-direction: column;
+  align-items: center; padding-top: 6px; gap: 8px;
+}
+.widget-rail-expand {
+  background: none; border: none; color: #666; cursor: pointer;
+  font-size: 14px; box-shadow: none;
+}
+.widget-rail-icon {
+  width: 26px; height: 26px; border-radius: 6px; background: rgba(0,0,0,0.06);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #555;
+}
+
+/* контролы (каталог D-074) */
+.widget-stack { display: flex; flex-direction: column; gap: 6px; }
+.widget-text { font-size: 12px; color: #333; }
+.widget-text.is-muted { color: #888; }
+.widget-indicator-track {
+  height: 8px; border-radius: 4px; background: rgba(0,0,0,0.1); overflow: hidden;
+}
+.widget-indicator-fill { height: 100%; transition: width .2s, background-color .2s; }
+.widget-indicator-label { font-size: 12px; color: #555; margin-left: 6px; }
+
+/* слоты цвета светофора (concept v5) — одинаковы в обеих темах */
+:root {
+  --meter-ok:   #2da44e;
+  --meter-warn: #bf8700;
+  --meter-high: #cc6b2c;
+  --meter-crit: #d1242f;
+}
+
+/* тёмная тема — по той же схеме, что и весь остальной UI */
+@media (prefers-color-scheme: dark) {
+  .widget-panel,
+  .widget-rail {
+    border-left-color: rgba(255,255,255,0.1);
+    background: #1b1b1b;
+  }
+  .widget-panel-head { border-bottom-color: rgba(255,255,255,0.1); }
+  .widget-panel-head button { color: #aaa; }
+  .widget-panel-head button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .widget-panel-pin.is-pinned { color: #61a0ff; }
+
+  .widget-rail-expand { color: #aaa; }
+  .widget-rail-icon { background: rgba(255,255,255,0.08); color: #ccc; }
+
+  .widget-text { color: #ddd; }
+  .widget-text.is-muted { color: #888; }
+  .widget-indicator-track { background: rgba(255,255,255,0.1); }
+  .widget-indicator-label { color: #bbb; }
+
+  :root {
+    --meter-ok:   #3fb950;
+    --meter-warn: #d29922;
+    --meter-high: #e07b39;
+    --meter-crit: #f85149;
+  }
+}

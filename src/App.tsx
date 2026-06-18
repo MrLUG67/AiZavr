@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
+import { WidgetPanel } from "./widgets/host/WidgetPanel";
+import type { WidgetFacts, NodeView } from "./widgets/host/types";
+import type { CapabilityDeps } from "./widgets/host/capabilities";
 
 // ---------------------------------------------------------------------------
 // Типы
@@ -111,6 +114,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [dialogId, setDialogId] = useState<string | null>(null);
   const [lastNodeId, setLastNodeId] = useState<string | null>(null);
+  // Граница ПРОСМОТРА (нижний частично видимый узел). Эфемерна: не в БД,
+  // отдельна от рабочего курсора lastNodeId (скролл не двигает рабочую позицию).
+  // Дефолт — последний узел (низ ленты при свежей загрузке).
+  const [visibleBoundaryNodeId, setVisibleBoundaryNodeId] = useState<string | null>(null);
   const [depth, setDepth] = useState<DepthIndicators>({ depth_left: 0, branches_right: 0 });
 
   // Ветвление
@@ -139,6 +146,7 @@ function App() {
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const messageEls = useRef<(HTMLDivElement | null)[]>([]);
+  const messagesDataRef = useRef<Message[]>([]); // зеркало messages для onFocus (стабильный колбэк)
 
   // Редактирование имени карточки
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -152,6 +160,10 @@ function App() {
   const [keyError, setKeyError] = useState("");
 
   const MODEL = "anthropic/claude-haiku-4-5";
+  // Окно модели для светофора. ВРЕМЕННО 2000 для проверки на коротком диалоге;
+  // реальное окно claude-haiku-4-5 = 200000. Со слоем ролей (v0.2) — из реестра
+  // моделей. ВАЖНО: это число ПЕРЕБИВАЕТ WINDOW_FALLBACK внутри context-meter.
+  const MODEL_WINDOW = 200000;
 
   // ---------------------------------------------------------------------------
   // Инициализация
@@ -215,6 +227,82 @@ function App() {
     return () => el.removeEventListener("wheel", onWheel);
   }, [forkMode]);
 
+  // Граница просмотра: следим, какой узел — нижний частично видимый.
+  // IntersectionObserver на messageEls (root = контейнер ленты). На остановке
+  // скролла берём МАКСИМАЛЬНЫЙ видимый индекс -> его nodeId = граница
+  // (visibleBoundaryNodeId эфемерен, считается из вьюпорта). debounce гасит
+  // дребезг — обновляем факт по затиханию, не на каждый кадр.
+  useEffect(() => {
+    const root = messagesRef.current;
+    if (!root || messages.length === 0) {
+      setVisibleBoundaryNodeId(null);
+      return;
+    }
+
+    const visible = new Set<number>();
+    let timer: number | null = null;
+
+    const recompute = () => {
+      if (visible.size === 0) return;
+      const maxIdx = Math.max(...visible);
+      const node = messages[maxIdx];
+      if (node) setVisibleBoundaryNodeId(node.nodeId);
+    };
+
+    const schedule = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(recompute, 350);
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const idx = Number((e.target as HTMLElement).dataset.msgIdx);
+          if (Number.isNaN(idx)) continue;
+          if (e.isIntersecting) visible.add(idx);
+          else visible.delete(idx);
+        }
+        schedule();
+      },
+      { root, threshold: 0 },
+    );
+
+    for (let i = 0; i < messages.length; i++) {
+      const el = messageEls.current[i];
+      if (el) observer.observe(el);
+    }
+
+    // Первичный расчёт без скролла: низ ленты виден -> граница = последний узел.
+    setVisibleBoundaryNodeId(messages[messages.length - 1].nodeId);
+
+    return () => {
+      observer.disconnect();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [messages]);
+
+  // Зеркало messages для стабильных колбэков (onFocus не держит messages в deps).
+  messagesDataRef.current = messages;
+
+  // Намерение фокуса от плагина (D-072): доскроллить к узлу в центральном потоке.
+  // Плагин в DOM не лезет — просит, App исполняет через messageEls.
+  const onFocus = useCallback((nodeId: string) => {
+    const arr = messagesDataRef.current;
+    const i = arr.findIndex((m) => m.nodeId === nodeId);
+    if (i < 0) return;
+    const el = messageEls.current[i];
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
+
+  // Зависимости капабилити для виджетов. Пересобираются только при смене диалога.
+  const capabilityDeps = useMemo<CapabilityDeps>(
+    () => ({
+      onFocus,
+      getActiveDialogId: () => dialogId,
+    }),
+    [onFocus, dialogId],
+  );
+
   // ---------------------------------------------------------------------------
   // Диалог
   // ---------------------------------------------------------------------------
@@ -276,6 +364,11 @@ function App() {
     );
 
     setMessages(restored);
+
+    // Обрезаем хвост рефов от прошлой (возможно более длинной) ветки, чтобы
+    // observer не цеплял протухшие узлы. messageEls пишется по индексу i и сам
+    // не сбрасывается.
+    messageEls.current.length = restored.length;
 
     if (branch.length > 0) {
       setLastNodeId(branch[branch.length - 1].id);
@@ -704,7 +797,26 @@ function App() {
 
   const isBlocked = forkMode || deletedMode;
 
+  // Факты для виджет-панели (D-072). activeBranch — проекция messages в NodeView;
+  // parentId восстановлен из порядка (ветка линейна: родитель i-го = i-1-й).
+  const activeBranch: NodeView[] = messages.map((m, i) => ({
+    id: m.nodeId,
+    parentId: i > 0 ? messages[i - 1].nodeId : null,
+    nodeType: m.nodeType as NodeView["nodeType"],
+    text: m.content,
+    hasMarker: m.markers.length > 0,
+  }));
+
+  const facts: WidgetFacts = {
+    activeDialogId: dialogId,
+    cursorNodeId: lastNodeId,
+    visibleBoundaryNodeId,
+    activeBranch,
+    context: { window: MODEL_WINDOW },
+  };
+
   return (
+    <div className="app-shell">
     <main className="container">
       <h1>AiZavr</h1>
 
@@ -822,6 +934,7 @@ function App() {
                 key={i}
                 className="message assistant message--unanswered"
                 ref={el => { messageEls.current[i] = el; }}
+                data-msg-idx={i}
               >
                 <div className="message-content message-content--unanswered">
                   <p className="unanswered-note">Ответ не получен</p>
@@ -835,6 +948,7 @@ function App() {
               key={i}
               className={`message ${m.role}`}
               ref={el => { messageEls.current[i] = el; }}
+              data-msg-idx={i}
             >
               <div className="message-content">
                 <p>{m.content}</p>
@@ -983,6 +1097,8 @@ function App() {
         </button>
       </div>
     </main>
+    <WidgetPanel facts={facts} capabilityDeps={capabilityDeps} />
+    </div>
   );
 }
 
