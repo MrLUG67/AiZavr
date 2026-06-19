@@ -6,9 +6,15 @@
 // Развилка sync/async (обещано при проектировании controls):
 //   update вернул State  -> применяем СИНХРОННО, сразу (правка preview: без лагов)
 //   update вернул Promise -> сериализуем через цепочку (вызовы ядра по порядку)
+// Обе ветви на УСПЕХЕ чистят error (симметрия): липкая ошибка update снимается
+// первым же удачным обновлением — хоть sync, хоть async.
 //
 // Падение плагина не роняет панель (D-070/D-073): view и update в try/catch,
 // при ошибке виджет показывает плашку, остальные виджеты живут.
+//
+// Применимость и неактивность (D-082/D-083): два рубежа перед/вокруг view —
+// ГРУБЫЙ (хост по manifest.supportedModels) и ТОНКИЙ (плагин вернул inactive).
+// Серую плашку обоих рубежей рисует ХОСТ единообразно (host-native, не контрол).
 
 import { useEffect, useRef, useState } from 'react';
 import { ControlTree, type Dispatch } from './controls';
@@ -17,10 +23,28 @@ import type {
   WidgetFacts,
   WidgetCapabilities,
   WidgetMsg,
+  ViewResult,
 } from './types';
 
 function isPromise<T>(x: T | Promise<T>): x is Promise<T> {
   return typeof (x as { then?: unknown })?.then === 'function';
+}
+
+// Применимость плагина к активной модели (D-082). ГРУБЫЙ рубеж: хост сверяет
+// facts.model.id с manifest.supportedModels. Отсутствует или '*' => любая модель.
+// Иначе совпадение по списку: точное равенство ЛИБО префикс-паттерн с хвостовой
+// звёздочкой ('openai/*' матчит 'openai/gpt-4o'). Минимум под реальную нужду
+// (D-074): шире не выдумываем, пока нет плагина, которому этого мало.
+function modelApplicable(
+  supported: string[] | '*' | undefined,
+  modelId: string,
+): boolean {
+  if (supported === undefined || supported === '*') return true;
+  return supported.some((pat) => {
+    if (pat === '*') return true;
+    if (pat.endsWith('*')) return modelId.startsWith(pat.slice(0, -1));
+    return pat === modelId;
+  });
 }
 
 export function WidgetHost<State>(props: {
@@ -62,9 +86,12 @@ export function WidgetHost<State>(props: {
     }
 
     if (!isPromise(result)) {
-      // СИНХРОННО: чистая мутация state (напр. правка preview) — сразу, без очереди
+      // СИНХРОННО: чистая мутация state (напр. правка preview) — сразу, без очереди.
+      // На успехе чистим error СИММЕТРИЧНО async-ветке: иначе плашка сбоя от
+      // прошлого упавшего async-обновления залипнет после удачного sync-update.
       stateRef.current = result;
       setState(result);
+      setError(null);
       return;
     }
 
@@ -94,6 +121,9 @@ export function WidgetHost<State>(props: {
   }, []);
 
   // ---- render ----
+
+  // (1) Сбой плагина (D-070/D-073) — приоритетнее всего: упал => плашка сбоя,
+  // независимо от применимости. role=alert (это ОШИБКА, не штатное состояние).
   if (error) {
     return (
       <div className="widget-error" role="alert">
@@ -102,9 +132,24 @@ export function WidgetHost<State>(props: {
     );
   }
 
-  let tree;
+  // (2) ГРУБЫЙ рубеж применимости (D-082/D-083): не та модель -> серая плашка,
+  // view НЕ зовётся. Причину пишет ХОСТ (плагин не запускался).
+  // Caveat MVP: рубеж глушит только ОТРИСОВКУ; initialState/@@mount/update выше
+  // всё равно отработали. Для context-meter (supportedModels '*') безвредно;
+  // model-specific плагинов в MVP нет (D-080 мир B — после MVP). Глушить bootstrap
+  // негодной модели — уточнение под реальный такой плагин, не сейчас (D-074).
+  if (!modelApplicable(def.manifest.supportedModels, facts.model.id)) {
+    return (
+      <div className="widget-inactive" aria-disabled="true">
+        Неприменимо к модели {facts.model.id}
+      </div>
+    );
+  }
+
+  // view -> ViewResult (D-083): состав (ControlNode) ЛИБО {inactive, reason}.
+  let result: ViewResult;
   try {
-    tree = def.view(state, facts);
+    result = def.view(state, facts);
   } catch (e) {
     console.error(`[widget ${def.manifest.id}] view threw`, e);
     return (
@@ -114,5 +159,17 @@ export function WidgetHost<State>(props: {
     );
   }
 
-  return <ControlTree root={tree} dispatch={dispatch} />;
+  // (3) ТОНКИЙ рубеж (D-083): модель подходит, но плагину нечего показать
+  // (нет беседы, негодный факт). Серую плашку с reason рисует ХОСТ единообразно.
+  // Сужение объединения: 'inactive' есть только у InactiveResult, не у ControlNode.
+  if ('inactive' in result) {
+    return (
+      <div className="widget-inactive" aria-disabled="true">
+        {result.reason}
+      </div>
+    );
+  }
+
+  // result сужен до ControlNode — отдаём рендереру каталога.
+  return <ControlTree root={result} dispatch={dispatch} />;
 }

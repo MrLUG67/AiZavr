@@ -7,20 +7,22 @@
 // ASCII дешевле (≈4 симв/токен), не-ASCII (кириллица/CJK) дороже (≈2 симв/токен).
 // Это ПРИБЛИЖЕНИЕ (D-011): точного локального токенайзера для Claude/OpenRouter нет.
 // Кто хочет точный счёт (tiktoken для OpenAI, count-tokens API для Anthropic) —
-// пишет свой плагин-светофор и ставит вместо этого. Веса и окно — параметры
-// модели, в MVP константы; со слоем ролей (v0.2) переедут в реестр моделей.
+// пишет свой плагин-светофор и ставит вместо этого. Веса — параметры плагина;
+// окно модели приходит ФАКТОМ (D-081, facts.model.contextWindow), не хардкодом.
 
 import type {
   WidgetDef,
   WidgetFacts,
   WidgetMsg,
-  ControlNode,
+  ViewResult,
   NodeView,
 } from '../host/types';
 
 type State = null;
 
-// Параметры модели (TODO: реестр моделей, v0.2). Сейчас под claude-haiku-4-5: окно 200k.
+// Страховка на случай негодного окна в факте (0/нет). В норме окно всегда даёт
+// App фактом; со слоем ролей (v0.2) и реестром моделей оно станет единственным
+// источником, и этот fallback можно будет убрать.
 const WINDOW_FALLBACK = 200000;
 const CHARS_PER_TOKEN_ASCII = 4;
 const CHARS_PER_TOKEN_NONASCII = 2;
@@ -76,7 +78,8 @@ export const contextMeter: WidgetDef<State> = {
     defaultOpen: true,
     order: 10,
     surface: 'panel',
-    capabilities: [], // ничего не трогает — только читает факты (disclosure, D-073)
+    supportedModels: '*', // символьная оценка модель-агностична (D-082): любая модель
+    capabilities: [],     // ничего не трогает — только читает факты (disclosure, D-073)
     author: 'core',
     version: '0.1.0',
   },
@@ -85,15 +88,15 @@ export const contextMeter: WidgetDef<State> = {
     return null;
   },
 
-  view(_state: State, facts: WidgetFacts): ControlNode {
+  view(_state: State, facts: WidgetFacts): ViewResult {
+    // Окно — факт модели (D-081). Негодное значение -> локальная страховка.
     const window =
-      facts.context.window > 0 ? facts.context.window : WINDOW_FALLBACK;
+      facts.model.contextWindow > 0 ? facts.model.contextWindow : WINDOW_FALLBACK;
 
+    // ТОНКИЙ рубеж (D-083): беседы нет -> штатное «нечего делать». Серую плашку
+    // с этим reason рисует ХОСТ единообразно; сам плагин её не верстает.
     if (!facts.activeDialogId || facts.activeBranch.length === 0) {
-      return {
-        kind: 'stack',
-        children: [{ kind: 'text', tone: 'muted', value: 'Нет активной беседы' }],
-      };
+      return { inactive: true, reason: 'Нет активной беседы' };
     }
 
     const end = boundaryIndex(facts.activeBranch, facts.visibleBoundaryNodeId);

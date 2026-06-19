@@ -807,12 +807,12 @@ function App() {
     hasMarker: m.markers.length > 0,
   }));
 
-  const facts: WidgetFacts = {
+const facts: WidgetFacts = {
     activeDialogId: dialogId,
     cursorNodeId: lastNodeId,
     visibleBoundaryNodeId,
     activeBranch,
-    context: { window: MODEL_WINDOW },
+    model: { id: MODEL, contextWindow: MODEL_WINDOW },   // D-081: факт модели вместо голого окна
   };
 
   return (
