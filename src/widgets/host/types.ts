@@ -18,6 +18,7 @@ export type CapabilityName =
   | 'markers.read'
   | 'compression.attach'
   | 'model.call'
+  | 'secrets'
   | 'ui.focus';
 
 export interface WidgetManifest {
@@ -56,7 +57,9 @@ export interface WidgetManifest {
 // Сообщения (TEA). Обработчик контрола несёт ТЕГ; ядро на событии обогащает
 // его динамическим значением (в поле value) и доставляет в update:
 //   button    -> доставляется как есть
-//   list      -> ядро добавляет value = id выбранного элемента
+//   list      -> ядро добавляет value = id выбранного элемента, а также его
+//                label и secondary (подпись/вторичный текст) — чтобы update не
+//                делал повторный lookup (фактов в update нет)
 //   segmented -> ядро добавляет value = выбранный option
 //   preview   -> ядро добавляет value = новый текст
 // Зарезервировано: { type: '@@mount' } — ядро шлёт ОДИН раз после монтирования,
@@ -87,6 +90,16 @@ export interface ModelFacts {
 // Ядро само перерисовывает виджет при изменении относящегося факта.
 // ---------------------------------------------------------------------------
 
+// Маркер на узле (D-058: только на assistant). Раньше узел нёс голый
+// hasMarker; теперь ядро отдаёт сами метки — плагин строит списки прямо из
+// факта и обновляется РЕАКТИВНО при постановке/снятии маркера (ядро перерисует
+// view при изменении ветки), без отдельного pull/refresh.
+export interface NodeMarker {
+  id: string;
+  label: string;
+  comment: string | null;
+}
+
 export interface NodeView {
   id: string;
   parentId: string | null;
@@ -100,7 +113,7 @@ export interface NodeView {
     | 'system'
     | 'context_migration';
   text: string;     // уже БЕЗ приватных диапазонов — вырезает ядро при проекции (D-078)
-  hasMarker: boolean;
+  markers: NodeMarker[];  // пусто, если меток нет (hasMarker := markers.length > 0)
 }
 
 export interface WidgetFacts {
@@ -110,6 +123,7 @@ export interface WidgetFacts {
   activeBranch: NodeView[];               // выпрямленный путь, проекция (не DbNode)
   model: ModelFacts;                      // активная модель (D-081); всегда есть —
                                           // без выбранной модели чат невозможен
+  activeLlmProviderId: string | null;     // какой LLM-плагин обрабатывает диалог
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +173,9 @@ export interface WidgetCapabilities {
       endNodeId: string;
       summaryText: string;
       placeholderText: string | null;
+      // D-088: модель-уплотнитель. null для детерминированного компрессора без
+      // вызова модели; реальный плагин передаёт id модели, которой сжал.
+      modelId: string | null;
       provenance: CompressionProvenance;
     }): Promise<void>;
   };
@@ -166,6 +183,13 @@ export interface WidgetCapabilities {
   // Маршрутизация по роли — слой ролей v0.2; в MVP-заглушке не используется.
   model: {
     call(role: string, messages: ChatMessage[]): Promise<string>;
+  };
+  // хранение секретов плагина (API-ключи) в системном keychain ядра.
+  // providerId — пространство имён плагина ('openrouter', 'anthropic', …).
+  secrets: {
+    set(providerId: string, apiKey: string): Promise<void>;
+    get(providerId: string): Promise<string | null>;
+    delete(providerId: string): Promise<void>;
   };
   // намерение в центральный поток — координация панель<->центр (D-072).
   ui: {
@@ -194,12 +218,17 @@ export interface SegOption {
 
 export type ControlNode =
   | { kind: 'stack'; children: ControlNode[] }
+  | { kind: 'row'; children: ControlNode[] }
+  | { kind: 'spacer' }
   | { kind: 'text'; value: string; tone?: 'normal' | 'muted' }
   | { kind: 'indicator'; value: number; max: number; color: string; label?: string }
   | { kind: 'list'; items: ListItem[]; onSelect: WidgetMsg }
-  | { kind: 'button'; label: string; disabled?: boolean; onClick: WidgetMsg }
+  | { kind: 'button'; label: string; disabled?: boolean; primary?: boolean; onClick: WidgetMsg }
+  | { kind: 'iconButton'; icon: string; title?: string; onClick: WidgetMsg }
+  | { kind: 'checkbox'; label: string; checked: boolean; disabled?: boolean; onChange: WidgetMsg }
   | { kind: 'segmented'; options: SegOption[]; value: string; onChange: WidgetMsg }
-  | { kind: 'preview'; text: string; editable?: boolean; onChange?: WidgetMsg };
+  | { kind: 'preview'; text: string; editable?: boolean; inputType?: 'text' | 'password'; onChange?: WidgetMsg }
+  | { kind: 'overlay'; children: ControlNode[] };
 
 // ---------------------------------------------------------------------------
 // Результат view (D-083). view возвращает ЛИБО состав (ControlNode), ЛИБО

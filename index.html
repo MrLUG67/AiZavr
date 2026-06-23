@@ -9,6 +9,21 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      // Тема до первой отрисовки (без мигания): выбор из localStorage,
+      // иначе системная. Значение читает и обновляет приложение.
+      (function () {
+        try {
+          var saved = localStorage.getItem("aizavr.theme");
+          var theme = saved === "dark" || saved === "light"
+            ? saved
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

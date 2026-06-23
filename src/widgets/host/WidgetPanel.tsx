@@ -18,6 +18,9 @@ import type { WidgetFacts } from './types';
 const LS_OPEN = 'aizavr.panel.open';
 const LS_PINNED = 'aizavr.panel.pinned';
 const LS_WIDTH = 'aizavr.panel.width';
+// Свёрнутость каждого виджета (D-070: хром панели владеет компактным/развёрнутым
+// видом, а не плагин). Ключ на id виджета.
+const LS_COLLAPSED = (id: string) => `aizavr.widget.collapsed.${id}`;
 
 const WIDTH_MIN = 240;
 const WIDTH_MAX = 560;
@@ -61,6 +64,26 @@ export function WidgetPanel(props: {
   const cap = useMemo(() => makeCapabilities(capabilityDeps), [capabilityDeps]);
 
   const widgets = useMemo(() => listWidgets(), []);
+
+  // Свёрнутость по id виджета. Начальное: из localStorage, иначе по
+  // manifest.defaultOpen (нет/true -> развёрнут, false -> свёрнут).
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const w of widgets) {
+      const id = w.manifest.id;
+      const fallback = !(w.manifest.defaultOpen ?? true);
+      init[id] = readBool(LS_COLLAPSED(id), fallback);
+    }
+    return init;
+  });
+
+  const toggleCollapsed = (id: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem(LS_COLLAPSED(id), next[id] ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
 
   // --- свёрнутое состояние: узкий рельс со стрелкой развернуть + иконки ---
   if (!open) {
@@ -131,16 +154,37 @@ export function WidgetPanel(props: {
         </button>
       </header>
 
-      {/* тело: виджеты по порядку из реестра, каждый в своей секции */}
+      {/* тело: виджеты по порядку из реестра, каждый в своей секции.
+          Заголовок-строка с треугольником сворачивает/разворачивает виджет. */}
       <div className="widget-panel-body">
-        {widgets.map((def) => (
-          <section key={def.manifest.id} className="widget-section">
-            <div className="widget-section-title">{def.manifest.title}</div>
-            <div className="widget-section-content">
-              <WidgetHost def={def} facts={facts} cap={cap} />
-            </div>
-          </section>
-        ))}
+        {widgets.map((def) => {
+          const id = def.manifest.id;
+          const isCollapsed = collapsed[id] ?? false;
+          return (
+            <section
+              key={id}
+              className={`widget-section ${isCollapsed ? 'is-collapsed' : ''}`}
+            >
+              <button
+                type="button"
+                className="widget-section-title"
+                onClick={() => toggleCollapsed(id)}
+                aria-expanded={!isCollapsed}
+                title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+              >
+                <span className="widget-section-caret">
+                  {isCollapsed ? '▼' : '▲'}
+                </span>
+                <span className="widget-section-name">{def.manifest.title}</span>
+              </button>
+              {!isCollapsed && (
+                <div className="widget-section-content">
+                  <WidgetHost def={def} facts={facts} cap={cap} />
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </aside>
   );

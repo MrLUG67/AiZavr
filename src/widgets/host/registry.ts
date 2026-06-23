@@ -10,6 +10,8 @@
 
 import type { WidgetDef } from './types';
 import { contextMeter } from '../context-meter';
+import { compression } from '../compression';
+import { openrouter } from '../openrouter';
 
 // Гетерогенность State: у каждого виджета свой тип состояния (светофор — null,
 // сжатие — мастер выбора диапазона). Хранить их в одной мапе строго типобезопасно
@@ -23,8 +25,9 @@ type AnyWidgetDef = WidgetDef<unknown>;
 
 // Единственный источник правды о составе. Ключ === manifest.id.
 const WIDGETS: Record<string, AnyWidgetDef> = {
+  [openrouter.manifest.id]: openrouter as AnyWidgetDef,
   [contextMeter.manifest.id]: contextMeter as AnyWidgetDef,
-  // [compression.manifest.id]: compression as AnyWidgetDef,  // сессия N+1
+  [compression.manifest.id]: compression as AnyWidgetDef,
 };
 
 // Инвариант ключ===id: ловим рассинхрон на старте, а не молчим.

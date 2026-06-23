@@ -31,10 +31,20 @@ export function renderControl(
     // -- единственный примитив раскладки: состав по порядку, не геометрия --
     case 'stack':
       return (
-        <div className="widget-stack" key={key}>
+        <div className="widget-stack widget-plugin-root" key={key}>
           {node.children.map((child, i) => renderControl(child, dispatch, i))}
         </div>
       );
+
+    case 'row':
+      return (
+        <div className="widget-row" key={key}>
+          {node.children.map((child, i) => renderControl(child, dispatch, i))}
+        </div>
+      );
+
+    case 'spacer':
+      return <div className="widget-row-spacer" key={key} />;
 
     case 'text':
       return (
@@ -71,7 +81,16 @@ export function renderControl(
             <li
               key={item.id}
               className={`widget-list-item ${item.selected ? 'is-selected' : ''}`}
-              onClick={() => dispatch(enrich(node.onSelect, item.id))}
+              // value = id выбранного; заодно несём его подпись/вторичный текст,
+              // чтобы update не делал повторный lookup (фактов в update нет).
+              onClick={() =>
+                dispatch({
+                  ...node.onSelect,
+                  value: item.id,
+                  label: item.label,
+                  secondary: item.secondary,
+                })
+              }
             >
               <span className="widget-list-item-label">{item.label}</span>
               {item.secondary !== undefined && (
@@ -85,13 +104,39 @@ export function renderControl(
     case 'button':
       return (
         <button
-          className="widget-button"
+          className={`widget-button ${node.primary ? 'is-primary' : ''}`}
           key={key}
           disabled={node.disabled}
           onClick={() => dispatch(node.onClick)}
         >
           {node.label}
         </button>
+      );
+
+    case 'iconButton':
+      return (
+        <button
+          className="widget-icon-button"
+          key={key}
+          type="button"
+          title={node.title}
+          onClick={() => dispatch(node.onClick)}
+        >
+          {node.icon}
+        </button>
+      );
+
+    case 'checkbox':
+      return (
+        <label className="widget-checkbox" key={key}>
+          <input
+            type="checkbox"
+            checked={node.checked}
+            disabled={node.disabled}
+            onChange={(e) => dispatch(enrich(node.onChange, e.target.checked))}
+          />
+          <span>{node.label}</span>
+        </label>
       );
 
     case 'segmented':
@@ -117,16 +162,34 @@ export function renderControl(
       return (
         <div className="widget-preview" key={key}>
           {node.editable && node.onChange ? (
-            <textarea
-              className="widget-preview-edit"
-              value={node.text}
-              onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
-                dispatch(enrich(node.onChange!, e.target.value))
-              }
-            />
+            node.inputType ? (
+              <input
+                className="widget-preview-input"
+                type={node.inputType}
+                value={node.text}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  dispatch(enrich(node.onChange!, e.target.value))
+                }
+              />
+            ) : (
+              <textarea
+                className="widget-preview-edit"
+                value={node.text}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  dispatch(enrich(node.onChange!, e.target.value))
+                }
+              />
+            )
           ) : (
             <div className="widget-preview-text">{node.text}</div>
           )}
+        </div>
+      );
+
+    case 'overlay':
+      return (
+        <div className="widget-overlay" key={key}>
+          {node.children.map((child, i) => renderControl(child, dispatch, i))}
         </div>
       );
 

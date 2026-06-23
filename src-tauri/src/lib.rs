@@ -1,33 +1,15 @@
 use tauri::Manager;
 
 mod db;
-mod llm;
 mod tree;
 mod keychain;
 mod markers;
+mod compression;
 
 use db::{DbDialog, DbNode};
-use llm::{Message, openrouter::OpenRouterProvider, LlmProvider};
 
 struct AppState {
     db: sqlx::SqlitePool,
-}
-
-// ---------------------------------------------------------------------------
-// LLM
-// ---------------------------------------------------------------------------
-
-#[tauri::command]
-async fn send_message(
-    messages: Vec<Message>,
-    model_id: String,
-) -> Result<String, String> {
-    let api_key = keychain::get_api_key("openrouter")?
-        .ok_or_else(|| "OpenRouter API key not set. Use Settings to add it.".to_string())?;
-
-    let provider = OpenRouterProvider::new(api_key);
-    let response = provider.send(messages, &model_id).await?;
-    Ok(response.content)
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +357,45 @@ async fn cmd_resolve_linear_range(
 }
 
 // ---------------------------------------------------------------------------
+// Сжатие (D-060/D-061/D-065/D-088)
+// ---------------------------------------------------------------------------
+
+/// Прикрепить готовый результат сжатия диапазона start..end в дерево.
+/// ЯДРО только крепит (S + заглушка + extra + провенанс модели); сам текст
+/// резюме формирует ПЛАГИН (D-066). model_id = модель-уплотнитель (None для
+/// детерминированного компрессора-заглушки), model_role проставляется ядром.
+#[tauri::command]
+async fn cmd_attach_compressed(
+    state: tauri::State<'_, AppState>,
+    start_node_id: String,
+    end_node_id: String,
+    summary_text: String,
+    placeholder_text: Option<String>,
+    model_id: Option<String>,
+    provenance: compression::CompressionProvenance,
+) -> Result<compression::AttachResult, String> {
+    compression::attach_compressed(
+        &state.db,
+        &start_node_id,
+        &end_node_id,
+        &summary_text,
+        placeholder_text.as_deref(),
+        model_id.as_deref(),
+        provenance,
+    )
+    .await
+}
+
+/// Прочитать метрику происхождения сжатия с узла S (D-065).
+#[tauri::command]
+async fn cmd_get_compression_meta(
+    state: tauri::State<'_, AppState>,
+    summary_node_id: String,
+) -> Result<Option<serde_json::Value>, String> {
+    compression::get_compression_meta(&state.db, &summary_node_id).await
+}
+
+// ---------------------------------------------------------------------------
 // Keychain
 // ---------------------------------------------------------------------------
 
@@ -419,7 +440,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            send_message,
             cmd_create_dialog,
             cmd_get_dialog,
             cmd_list_dialogs,
@@ -449,6 +469,8 @@ pub fn run() {
             cmd_list_startable_markers,
             cmd_list_reachable_ends,
             cmd_resolve_linear_range,
+            cmd_attach_compressed,
+            cmd_get_compression_meta,
             cmd_set_api_key,
             cmd_get_api_key,
             cmd_delete_api_key,

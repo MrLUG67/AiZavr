@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 import { WidgetPanel } from "./widgets/host/WidgetPanel";
-import type { WidgetFacts, NodeView } from "./widgets/host/types";
+import { MenuBar } from "./components/MenuBar";
+import { NotebooksPanel } from "./components/NotebooksPanel";
+import type { WidgetFacts, NodeView, ModelFacts } from "./widgets/host/types";
 import type { CapabilityDeps } from "./widgets/host/capabilities";
+import {
+  getActiveLlmProvider,
+  getActiveLlmProviderId,
+  subscribeLlmProvider,
+} from "./widgets/llm/registry";
 
 // ---------------------------------------------------------------------------
 // Типы
@@ -50,11 +57,6 @@ interface DbNode {
   is_deleted: boolean;
 }
 
-interface DepthIndicators {
-  depth_left: number;
-  branches_right: number;
-}
-
 interface SendResult {
   query_id: string;
   placeholder_id: string;
@@ -93,6 +95,19 @@ function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
       }
       return;
     }
+    // Узел-резюме сжатия (S): уходит в модель как вводный контекст вместо
+    // свёрнутого диапазона (D-060). Структурно сидит в Q-слоте -> роль user.
+    if (n.node_type === "compressed_summary") {
+      out.push({
+        role: "user",
+        content: `[Сжатое резюме предыдущего участка беседы]\n${n.content}`,
+      });
+      return;
+    }
+    // Заглушка под S — служебная, в модель НЕ идёт (D-061).
+    if (n.node_type === "compression_placeholder") {
+      return;
+    }
     if (n.node_type === "user_message") {
       out.push({ role: "user", content: n.content });
     } else if (n.node_type === "assistant_message") {
@@ -101,7 +116,20 @@ function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
     // прочие служебные типы — в LLM не идут
   });
 
-  return out;
+  // Склейка соседних сообщений одной роли: после среза заглушек и вставки S
+  // могут оказаться два user подряд (S + новый вопрос). Сливаем, чтобы не
+  // ломать чередование ролей у провайдера.
+  const merged: LlmMessage[] = [];
+  for (const m of out) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === m.role) {
+      last.content += `\n\n${m.content}`;
+    } else {
+      merged.push({ ...m });
+    }
+  }
+
+  return merged;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,17 +140,28 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Последняя ошибка отправки в LLM — показываем причину, а не только серую
+  // плашку "ответ не получен". Сбрасывается при следующей удачной отправке.
+  const [sendError, setSendError] = useState<string | null>(null);
   const [dialogId, setDialogId] = useState<string | null>(null);
   const [lastNodeId, setLastNodeId] = useState<string | null>(null);
   // Граница ПРОСМОТРА (нижний частично видимый узел). Эфемерна: не в БД,
   // отдельна от рабочего курсора lastNodeId (скролл не двигает рабочую позицию).
   // Дефолт — последний узел (низ ленты при свежей загрузке).
   const [visibleBoundaryNodeId, setVisibleBoundaryNodeId] = useState<string | null>(null);
-  const [depth, setDepth] = useState<DepthIndicators>({ depth_left: 0, branches_right: 0 });
 
-  // Ветвление
+  // Ветвление. Альтернативный запрос вводится в общем нижнем поле (composer),
+  // отдельного встроенного инпута больше нет. branchingFromId != null —
+  // признак режима «альтернативный запрос» для этого A-узла.
   const [branchingFromId, setBranchingFromId] = useState<string | null>(null);
-  const [branchInput, setBranchInput] = useState("");
+
+  // Нижнее поле ввода (composer): высота тянется за верхнюю границу.
+  const [composerHeight, setComposerHeight] = useState(120);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Автоскролл ленты: пока пользователь не увёл взгляд вверх вручную, держим
+  // низ ленты приклеенным — последняя строка отправленного видна над полем.
+  const [stickToBottom, setStickToBottom] = useState(true);
   
   // Маркеры (D-058) — раскрытое поле комментария при постановке
   const [markingNodeId, setMarkingNodeId] = useState<string | null>(null);
@@ -141,7 +180,9 @@ function App() {
 
   // Режим восстановления удалённых веток (D-050)
   const [deletedMode, setDeletedMode] = useState(false);
-  const [deletedForkNodeId, setDeletedForkNodeId] = useState<string | null>(null);
+  // Значение не читается (оверлей удалённых не ссылается на A-узел) — держим
+  // только сеттер; иначе noUnusedLocals валит сборку (TS6133).
+  const [, setDeletedForkNodeId] = useState<string | null>(null);
   const [deletedForkCards, setDeletedForkCards] = useState<BranchCard[]>([]);
 
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -154,45 +195,78 @@ function App() {
   const [menuNodeId, setMenuNodeId] = useState<string | null>(null);
   const clickTimer = useRef<number | null>(null);
 
-  // API key
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
-  const [keyInput, setKeyInput] = useState("");
-  const [keyError, setKeyError] = useState("");
-
-  const MODEL = "anthropic/claude-haiku-4-5";
-  // Окно модели для светофора. ВРЕМЕННО 2000 для проверки на коротком диалоге;
-  // реальное окно claude-haiku-4-5 = 200000. Со слоем ролей (v0.2) — из реестра
-  // моделей. ВАЖНО: это число ПЕРЕБИВАЕТ WINDOW_FALLBACK внутри context-meter.
-  const MODEL_WINDOW = 200000;
+  // Активная модель — от LLM-плагина (OpenRouter), не от ядра.
+  const [modelFacts, setModelFacts] = useState<ModelFacts>({
+    id: "",
+    contextWindow: 200000,
+  });
+  const [activeLlmProviderId, setActiveLlmProviderId] = useState<string | null>(
+    () => getActiveLlmProviderId(),
+  );
 
   // ---------------------------------------------------------------------------
   // Инициализация
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    async function init() {
-      const key = await invoke<string | null>("cmd_get_api_key", { providerId: "openrouter" });
-      if (!key) { setHasApiKey(false); return; }
-      setHasApiKey(true);
-      await initDialog();
-    }
-    init().catch(console.error);
+    initDialog().catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    const updateLlm = () => {
+      setActiveLlmProviderId(getActiveLlmProviderId());
+      const provider = getActiveLlmProvider();
+      if (provider?.isReady()) {
+        setModelFacts(provider.getModelFacts());
+      } else {
+        setModelFacts({ id: "", contextWindow: 200000 });
+      }
+    };
+    updateLlm();
+    return subscribeLlmProvider(updateLlm);
   }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (editingNodeId) return;
 
-      if (e.key === "F2" && forkMode) {
-        e.preventDefault();
-        const card = forkCards[forkActiveIdx];
-        if (card) startEditing(card.nodeId);
-        return;
-      }
-
-      if (e.key === "Enter" && forkMode) {
-        e.preventDefault();
-        selectForkCard(forkActiveIdx);
+      // Режим развилки: плашки альтернатив внизу.
+      if (forkMode) {
+        if (e.key === "F2") {
+          e.preventDefault();
+          const card = forkCards[forkActiveIdx];
+          if (card) startEditing(card.nodeId);
+          return;
+        }
+        // Ctrl+↑/↓ — НЕ проваливаемся, а едем дальше к следующему
+        // маркеру/развилке в этом направлении (плашки закроются).
+        if (e.ctrlKey && e.key === "ArrowUp") {
+          e.preventDefault();
+          navigateUp();
+          return;
+        }
+        if (e.ctrlKey && e.key === "ArrowDown") {
+          e.preventDefault();
+          navigateDown();
+          return;
+        }
+        // Enter или ↓ (без Ctrl) — проваливаемся в выбранную ветку.
+        if (e.key === "Enter" || (e.key === "ArrowDown" && !e.ctrlKey)) {
+          e.preventDefault();
+          selectForkCard(forkActiveIdx);
+          return;
+        }
+        // ←/→ — выбор варианта; с Ctrl — к крайнему левому/правому.
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          setForkActiveIdx(i => (e.ctrlKey ? 0 : Math.max(0, i - 1)));
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setForkActiveIdx(i => (e.ctrlKey ? forkCards.length - 1 : Math.min(forkCards.length - 1, i + 1)));
+          return;
+        }
         return;
       }
 
@@ -200,16 +274,10 @@ function App() {
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        handleCtrlUp();
+        navigateUp();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        handleCtrlDown();
-      } else if (e.key === "ArrowLeft" && forkMode) {
-        e.preventDefault();
-        setForkActiveIdx(i => Math.max(0, i - 1));
-      } else if (e.key === "ArrowRight" && forkMode) {
-        e.preventDefault();
-        setForkActiveIdx(i => Math.min(forkCards.length - 1, i + 1));
+        navigateDown();
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -281,6 +349,67 @@ function App() {
     };
   }, [messages]);
 
+  // Автоскролл: при любом изменении ленты (ответ, запрос, заглушка, «Думаю»)
+  // доезжаем до низа, ЕСЛИ пользователь не отлистал вверх. useLayoutEffect —
+  // чтобы прыжок случился до отрисовки и без мигания. composerHeight в deps:
+  // когда поле растёт и лента сжимается, низ тоже подтягиваем.
+  useLayoutEffect(() => {
+    if (!stickToBottom) return;
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading, sendError, composerHeight, stickToBottom]);
+
+  // Признак «прилипания» к низу: пользователь у самого низа -> держим автоскролл;
+  // отлистал вверх -> отпускаем, ничего не дёргаем под руками.
+  function handleMessagesScroll() {
+    const el = messagesRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setStickToBottom(distanceFromBottom < 40);
+  }
+
+  // Кнопка-стрелка вниз: доезжаем до низа и снова приклеиваемся.
+  function scrollToBottom() {
+    const el = messagesRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    setStickToBottom(true);
+  }
+
+  // Позиционирование на ветвлении: ставим к низу области сообщений последнюю
+  // строку БАЗОВОГО запроса этой ветки — вопроса, который идёт сразу за
+  // выбранным A-узлом. Тогда старый вопрос видно прямо над полем с надписью
+  // «Альтернативный запрос:». Если следующий узел не Q — берём сам A-узел.
+  function scrollBranchBaseIntoView(assistantNodeId: string) {
+    const arr = messagesDataRef.current;
+    const idx = arr.findIndex(m => m.nodeId === assistantNodeId);
+    if (idx < 0) return;
+    let targetIdx = idx;
+    if (idx + 1 < arr.length && arr[idx + 1].role === "user") targetIdx = idx + 1;
+    const el = messageEls.current[targetIdx];
+    el?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }
+
+  // Тянем верхнюю границу поля ввода: вверх — выше, вниз — ниже. Границы
+  // 60px..60% высоты окна, чтобы лента не схлопнулась.
+  function startComposerResize(e: React.MouseEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = composerHeight;
+    const onMove = (ev: MouseEvent) => {
+      const dy = startY - ev.clientY; // тянем вверх -> dy>0 -> поле выше
+      const h = Math.min(window.innerHeight * 0.6, Math.max(60, startH + dy));
+      setComposerHeight(h);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
   // Зеркало messages для стабильных колбэков (onFocus не держит messages в deps).
   messagesDataRef.current = messages;
 
@@ -299,6 +428,9 @@ function App() {
     () => ({
       onFocus,
       getActiveDialogId: () => dialogId,
+      // Ядровая операция плагина изменила дерево (attach сжатия сдвинул курсор
+      // на заглушку под S) — перечитываем активную ветку.
+      onTreeChanged: () => { if (dialogId) loadBranch(dialogId); },
     }),
     [onFocus, dialogId],
   );
@@ -329,7 +461,9 @@ function App() {
       n =>
         n.node_type === "user_message" ||
         n.node_type === "assistant_message" ||
-        n.node_type === "unanswered_placeholder"
+        n.node_type === "unanswered_placeholder" ||
+        n.node_type === "compressed_summary" ||
+        n.node_type === "compression_placeholder"
     );
 
     const restored: Message[] = await Promise.all(
@@ -373,9 +507,6 @@ function App() {
     if (branch.length > 0) {
       setLastNodeId(branch[branch.length - 1].id);
     }
-
-    const indicators = await invoke<DepthIndicators>("cmd_get_depth_indicators", { dialogId: dId });
-    setDepth(indicators);
   }
 
   // ---------------------------------------------------------------------------
@@ -483,12 +614,14 @@ function App() {
     if (!dialogId || !forkNodeId) return;
     const card = forkCards[idx];
     if (!card) return;
+    // card.nodeId — первый узел выбранной ветки (дочерний Q развилки).
+    const childId = card.nodeId;
 
     try {
       await invoke("cmd_select_branch", {
         dialogId,
         forkNodeId,
-        childId: card.nodeId,
+        childId,
       });
     } catch (e) {
       console.error("select_branch failed:", e);
@@ -496,6 +629,15 @@ function App() {
 
     await closeForkMode();
     await loadBranch(dialogId);
+
+    // Проваливаемся только на ПЕРВОЕ сообщение ветки (не в самый низ) — ставим
+    // его к верху окна. Дальше вниз — кнопками/стрелкой справа внизу.
+    setStickToBottom(false);
+    setTimeout(() => {
+      const i = messagesDataRef.current.findIndex(m => m.nodeId === childId);
+      const el = messageEls.current[i];
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   // ---------------------------------------------------------------------------
@@ -553,53 +695,106 @@ function App() {
   // Навигация
   // ---------------------------------------------------------------------------
 
-  // Ctrl+Up — ищем развилку с > 1 ВИДИМЫХ веток (D-049: удалённые не в счёт)
-  function handleCtrlUp() {
-    if (forkMode) return;
+  // Навигация Ctrl+↑ / Ctrl+↓ — прыжки по «точкам остановки»: это узлы с
+  // маркером ИЛИ развилки (>1 видимой ветки, D-049). Узел встаёт нижней
+  // строкой к низу области сообщений. Развилка дополнительно раскрывает
+  // плашки альтернатив внизу.
+
+  interface NavStop {
+    nodeId: string;
+    type: "marker" | "fork";
+    targetScrollTop: number;
+  }
+
+  // Собираем все точки остановки в координатах контента ленты (с поправкой на
+  // текущий scrollTop), плюс целевой scrollTop, чтобы низ узла лёг к низу окна.
+  function collectNavStops(): NavStop[] {
     const container = messagesRef.current;
-    if (!container) return;
-
+    if (!container) return [];
     const containerTop = container.getBoundingClientRect().top;
-    const viewportHeight = container.clientHeight;
-
-    for (let i = messages.length - 1; i >= 0; i--) {
+    const clientH = container.clientHeight;
+    const scrollTop = container.scrollTop;
+    const stops: NavStop[] = [];
+    for (let i = 0; i < messages.length; i++) {
       const m = messages[i];
-      if (m.role !== "assistant") continue;
       const visibleCount = m.childrenCount - m.deletedChildrenCount;
-      if (visibleCount <= 1) continue;
+      const isFork = m.role === "assistant" && visibleCount > 1;
+      const isMarker = m.markers.length > 0;
+      if (!isFork && !isMarker) continue;
       const el = messageEls.current[i];
       if (!el) continue;
       const relTop = el.getBoundingClientRect().top - containerTop;
-      if (relTop < viewportHeight) {
-        openForkMode(m.nodeId);
-        return;
-      }
+      const contentBottom = relTop + scrollTop + el.offsetHeight;
+      const targetScrollTop = Math.max(0, contentBottom - clientH);
+      // Развилка приоритетнее маркера, если узел и то и другое.
+      stops.push({ nodeId: m.nodeId, type: isFork ? "fork" : "marker", targetScrollTop });
     }
-
-    container.scrollTo({ top: 0, behavior: "smooth" });
+    return stops;
   }
 
-  function handleCtrlDown() {
-    if (forkMode) selectForkCard(forkActiveIdx);
+  // Доводим низ узла к низу окна по текущей геометрии (после смены раскладки —
+  // открытия/закрытия плашек — клиентская высота меняется, считаем заново).
+  function scrollNodeBottomToView(nodeId: string) {
+    const container = messagesRef.current;
+    if (!container) return;
+    const i = messagesDataRef.current.findIndex(m => m.nodeId === nodeId);
+    if (i < 0) return;
+    const el = messageEls.current[i];
+    if (!el) return;
+    const containerTop = container.getBoundingClientRect().top;
+    const contentBottom =
+      el.getBoundingClientRect().top - containerTop + container.scrollTop + el.offsetHeight;
+    const target = Math.max(0, contentBottom - container.clientHeight);
+    container.scrollTo({ top: target, behavior: "smooth" });
+  }
+
+  function applyNavStop(stop: NavStop) {
+    setStickToBottom(false);
+    if (stop.type === "fork") {
+      openForkMode(stop.nodeId);
+    } else if (forkMode) {
+      closeForkMode();
+    }
+    // Раскладка низа меняется при открытии/закрытии плашек — скроллим после
+    // коммита, по обновлённой высоте окна.
+    setTimeout(() => scrollNodeBottomToView(stop.nodeId), 0);
+  }
+
+  function navigateUp() {
+    const container = messagesRef.current;
+    if (!container) return;
+    const cur = container.scrollTop;
+    const above = collectNavStops().filter(s => s.targetScrollTop < cur - 2);
+    if (above.length === 0) {
+      // Выше точек нет — просто к самому верху.
+      if (forkMode) closeForkMode();
+      setStickToBottom(false);
+      container.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const next = above.reduce((a, b) => (b.targetScrollTop > a.targetScrollTop ? b : a));
+    applyNavStop(next);
+  }
+
+  function navigateDown() {
+    const container = messagesRef.current;
+    if (!container) return;
+    const cur = container.scrollTop;
+    const below = collectNavStops().filter(s => s.targetScrollTop > cur + 2);
+    if (below.length === 0) {
+      // Ниже точек нет — к самому низу, снова приклеиваемся.
+      if (forkMode) closeForkMode();
+      setStickToBottom(true);
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      return;
+    }
+    const next = below.reduce((a, b) => (b.targetScrollTop < a.targetScrollTop ? b : a));
+    applyNavStop(next);
   }
 
   // ---------------------------------------------------------------------------
   // Отправка сообщений
   // ---------------------------------------------------------------------------
-
-  async function saveApiKey() {
-    setKeyError("");
-    const trimmed = keyInput.trim();
-    if (!trimmed) { setKeyError("Key cannot be empty."); return; }
-    try {
-      await invoke("cmd_set_api_key", { providerId: "openrouter", apiKey: trimmed });
-      setHasApiKey(true);
-      setKeyInput("");
-      await initDialog();
-    } catch (e) {
-      setKeyError(`Failed to save key: ${e}`);
-    }
-  }
 
   async function sendMessage() {
     if (!input.trim() || loading || !dialogId) return;
@@ -608,6 +803,37 @@ function App() {
     setLoading(true);
     await doSend(dialogId, lastNodeId, userText);
     setLoading(false);
+  }
+
+  // Единая отправка из нижнего поля: в режиме ветвления уходит альтернативный
+  // запрос, иначе обычный.
+  function submitComposer() {
+    if (branchingFromId) sendBranch();
+    else sendMessage();
+  }
+
+  // Войти в режим альтернативного запроса для A-узла: общее нижнее поле
+  // получает префикс «Альтернативный запрос:» и фокус. Повторный «+» — отмена.
+  function toggleBranching(nodeId: string) {
+    setBranchingFromId(prev => {
+      const next = prev === nodeId ? null : nodeId;
+      if (next) {
+        // Отпускаем автоскролл (базовый вопрос не у самого низа ленты) и
+        // подводим его к низу области сообщений.
+        setStickToBottom(false);
+        setTimeout(() => {
+          scrollBranchBaseIntoView(nodeId);
+          composerRef.current?.focus();
+        }, 0);
+      }
+      return next;
+    });
+    setInput("");
+  }
+
+  function cancelBranching() {
+    setBranchingFromId(null);
+    setInput("");
   }
 
 // ---------------------------------------------------------------------------
@@ -683,10 +909,10 @@ function App() {
   }
 
   async function sendBranch() {
-    if (!branchInput.trim() || loading || !dialogId || !branchingFromId) return;
-    const userText = branchInput.trim();
+    if (!input.trim() || loading || !dialogId || !branchingFromId) return;
+    const userText = input.trim();
     const parentId = branchingFromId;
-    setBranchInput("");
+    setInput("");
     setBranchingFromId(null);
     setLoading(true);
 
@@ -704,20 +930,26 @@ function App() {
 
       const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId });
       const llmMessages = buildLlmMessages(branch);
-      const response = await invoke<string>("send_message", { messages: llmMessages, modelId: MODEL });
+      const provider = getActiveLlmProvider();
+      if (!provider?.isReady()) {
+        throw new Error("LLM-плагин не настроен. Укажите API-ключ в виджете OpenRouter.");
+      }
+      const response = await provider.generateResponse(llmMessages, "main_dialog");
 
       await invoke<DbNode>("cmd_resolve_answer", {
         placeholderId: sent.placeholder_id,
-        content: response,
-        modelId: MODEL,
+        content: response.content,
+        modelId: response.modelId,
         modelRole: "main_dialog",
-        tokensCount: 0,
+        tokensCount: response.tokensInput + response.tokensOutput,
       });
+      setSendError(null);
       await loadBranch(dialogId);
     } catch (e) {
       // Ответ не получен — заглушка остаётся в дереве, в ленте покажется
       // серой плашкой "ответ не получен". Просто перечитываем ветку.
       console.error("sendBranch failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
       await loadBranch(dialogId);
     } finally {
       setLoading(false);
@@ -746,21 +978,27 @@ function App() {
     try {
       const branch = await invoke<DbNode[]>("cmd_get_branch", { dialogId: dId });
       const llmMessages = buildLlmMessages(branch);
-      const response = await invoke<string>("send_message", { messages: llmMessages, modelId: MODEL });
+      const provider = getActiveLlmProvider();
+      if (!provider?.isReady()) {
+        throw new Error("LLM-плагин не настроен. Укажите API-ключ в виджете OpenRouter.");
+      }
+      const response = await provider.generateResponse(llmMessages, "main_dialog");
 
       await invoke<DbNode>("cmd_resolve_answer", {
         placeholderId: sent.placeholder_id,
-        content: response,
-        modelId: MODEL,
+        content: response.content,
+        modelId: response.modelId,
         modelRole: "main_dialog",
-        tokensCount: 0,
+        tokensCount: response.tokensInput + response.tokensOutput,
       });
 
+      setSendError(null);
       await loadBranch(dId);
     } catch (e) {
       // LLM не ответил: заглушка остаётся unanswered_placeholder.
       // В ленте — серая плашка "ответ не получен". Ничего не перезаписываем.
       console.error("resolve_answer/send_message failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
       await loadBranch(dId);
     }
   }
@@ -768,32 +1006,6 @@ function App() {
   // ---------------------------------------------------------------------------
   // Рендер
   // ---------------------------------------------------------------------------
-
-  if (hasApiKey === null) {
-    return <main className="container"><p className="loading">Loading...</p></main>;
-  }
-
-  if (hasApiKey === false) {
-    return (
-      <main className="container">
-        <h1>AiZavr</h1>
-        <div className="setup">
-          <p>Enter your <a href="https://openrouter.ai/keys" target="_blank">OpenRouter API key</a> to get started.</p>
-          <div className="input-row">
-            <input
-              type="password"
-              value={keyInput}
-              onChange={e => setKeyInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && saveApiKey()}
-              placeholder="sk-or-..."
-            />
-            <button onClick={saveApiKey}>Save</button>
-          </div>
-          {keyError && <p className="error">{keyError}</p>}
-        </div>
-      </main>
-    );
-  }
 
   const isBlocked = forkMode || deletedMode;
 
@@ -804,7 +1016,9 @@ function App() {
     parentId: i > 0 ? messages[i - 1].nodeId : null,
     nodeType: m.nodeType as NodeView["nodeType"],
     text: m.content,
-    hasMarker: m.markers.length > 0,
+    // Метки едут как факт: плагины (сжатие) строят списки прямо из ветки и
+    // обновляются реактивно при постановке/снятии маркера — без ручного refresh.
+    markers: m.markers.map(mk => ({ id: mk.id, label: mk.label, comment: mk.comment })),
   }));
 
 const facts: WidgetFacts = {
@@ -812,92 +1026,17 @@ const facts: WidgetFacts = {
     cursorNodeId: lastNodeId,
     visibleBoundaryNodeId,
     activeBranch,
-    model: { id: MODEL, contextWindow: MODEL_WINDOW },   // D-081: факт модели вместо голого окна
+    model: modelFacts,
+    activeLlmProviderId,
   };
 
   return (
+    <div className="app-root">
+    <MenuBar />
     <div className="app-shell">
+    <NotebooksPanel />
     <main className="container">
       <h1>AiZavr</h1>
-
-      {/* Индикаторы глубины */}
-      <div className="depth-indicators">
-        <div className="depth-left">
-          {Array.from({ length: depth.depth_left }).map((_, i) => (
-            <span key={i} className="depth-bar" />
-          ))}
-        </div>
-        <div className="depth-right">
-          {Array.from({ length: depth.branches_right }).map((_, i) => (
-            <span key={i} className="depth-bar" />
-          ))}
-        </div>
-      </div>
-
-      {/* Режим развилки */}
-      {forkMode && (
-        <div className="fork-overlay">
-          <div className="fork-header">
-            <span className="fork-title">Выбор ветки</span>
-            <button className="fork-close-btn" onClick={closeForkMode}>✕</button>
-          </div>
-          <div className="fork-cards" ref={cardsRef}>
-            {forkCards.map((card, idx) => (
-              <div
-                key={card.nodeId}
-                className={`fork-card ${idx === forkActiveIdx ? "fork-card--active" : ""} ${card.isActive ? "fork-card--current" : ""}`}
-                onMouseEnter={() => setForkActiveIdx(idx)}
-                onClick={() => { if (editingNodeId !== card.nodeId) handleCardClick(idx); }}
-                onDoubleClick={() => handleCardDoubleClick(card.nodeId)}
-              >
-                {editingNodeId === card.nodeId ? (
-                  <input
-                    className="fork-card-edit"
-                    autoFocus
-                    value={editingText}
-                    onChange={e => setEditingText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") { e.preventDefault(); saveEditing(); }
-                      else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
-                    }}
-                    onBlur={saveEditing}
-                    onClick={e => e.stopPropagation()}
-                  />
-                ) : (
-                  <>
-                    <span className="fork-card-name">{card.branchName}</span>
-                    {card.isActive && <span className="fork-card-badge">текущая</span>}
-
-                    <button
-                      className="fork-card-menu-btn"
-                      title="Меню ветки"
-                      onClick={e => {
-                        e.stopPropagation();
-                        setMenuNodeId(menuNodeId === card.nodeId ? null : card.nodeId);
-                      }}
-                    >
-                      ⋮
-                    </button>
-
-                    {menuNodeId === card.nodeId && (
-                      <div className="fork-card-menu" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => startEditing(card.nodeId)}>Редактировать</button>
-                        <button
-                          onClick={() => deleteCardBranch(card.nodeId)}
-                          style={{ color: "#c0392b" }}
-                        >
-                          Удалить ветку
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="fork-hint">Ctrl+← → или мышь · Enter / Ctrl+↓ / клик — перейти · F2 / двойной клик — переименовать</div>
-        </div>
-      )}
 
       {/* Режим восстановления удалённых веток (D-050) */}
       {deletedMode && (
@@ -923,7 +1062,8 @@ const facts: WidgetFacts = {
       )}
 
       {/* Сообщения */}
-      <div className="messages" ref={messagesRef}>
+      <div className="messages-wrap">
+      <div className="messages" ref={messagesRef} onScroll={handleMessagesScroll}>
         {messages.map((m, i) => {
           const visibleCount = m.childrenCount - m.deletedChildrenCount;
 
@@ -938,8 +1078,42 @@ const facts: WidgetFacts = {
               >
                 <div className="message-content message-content--unanswered">
                   <p className="unanswered-note">Ответ не получен</p>
+                  {i === messages.length - 1 && sendError && (
+                    <p className="unanswered-error">{sendError}</p>
+                  )}
                 </div>
               </div>
+            );
+          }
+
+          // Узел-резюме сжатия (S): нейтральная плашка по центру (НЕ пузырь
+          // ассистента) — S сидит в Q-слоте, это третий вид узла, не A и не Q.
+          if (m.nodeType === "compressed_summary") {
+            return (
+              <div
+                key={i}
+                className="message message--compressed"
+                ref={el => { messageEls.current[i] = el; }}
+                data-msg-idx={i}
+              >
+                <div className="message-content message-content--compressed">
+                  <div className="compressed-badge">⊟ Уплотнённый фрагмент</div>
+                  <p>{m.content}</p>
+                </div>
+              </div>
+            );
+          }
+
+          // Заглушка под S — служебный узел A-слота (D-061). В ленте не показываем,
+          // но держим элемент с ref, чтобы индексация observer'а не сбилась.
+          if (m.nodeType === "compression_placeholder") {
+            return (
+              <div
+                key={i}
+                className="message message--compression-placeholder"
+                ref={el => { messageEls.current[i] = el; }}
+                data-msg-idx={i}
+              />
             );
           }
 
@@ -978,12 +1152,9 @@ const facts: WidgetFacts = {
 
                   {m.childrenCount > 0 && (
                     <button
-                      className="branch-btn"
+                      className={`branch-btn ${branchingFromId === m.nodeId ? "branch-btn--active" : ""}`}
                       title="Создать ветку"
-                      onClick={() => {
-                        setBranchingFromId(branchingFromId === m.nodeId ? null : m.nodeId);
-                        setBranchInput("");
-                      }}
+                      onClick={() => toggleBranching(m.nodeId)}
                     >
                       +
                     </button>
@@ -1063,41 +1234,160 @@ const facts: WidgetFacts = {
                 </div>
               )}
 
-              {branchingFromId === m.nodeId && (
-                <div className="branch-input-row">
-                  <input
-                    autoFocus
-                    value={branchInput}
-                    onChange={e => setBranchInput(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && sendBranch()}
-                    placeholder="Альтернативный вопрос..."
-                    disabled={loading}
-                  />
-                  <button onClick={sendBranch} disabled={loading}>→</button>
-                  <button onClick={() => setBranchingFromId(null)}>✕</button>
-                </div>
-              )}
             </div>
           );
         })}
         {loading && <p className="loading">Думаю...</p>}
       </div>
 
-      {/* Поле ввода */}
-      <div className="input-row">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && sendMessage()}
-          placeholder="Введите сообщение..."
-          disabled={loading || !dialogId || isBlocked}
-        />
-        <button onClick={sendMessage} disabled={loading || !dialogId || isBlocked}>
-          Отправить
+        {/* Стрелка вниз: активна, когда пользователь отлистал вверх. */}
+        <button
+          className={`scroll-bottom-btn ${stickToBottom ? "" : "is-visible"}`}
+          onClick={scrollToBottom}
+          title="К последней строке"
+          aria-label="К последней строке"
+        >
+          ↓
         </button>
       </div>
+
+      {/* Ошибка последней отправки в LLM (если была) */}
+      {sendError && !loading && (
+        <div className="send-error" role="alert">
+          <span className="send-error-text">⚠ {sendError}</span>
+          <button className="send-error-close" onClick={() => setSendError(null)} title="Скрыть">×</button>
+        </div>
+      )}
+
+      {/* Режим развилки: плашки альтернатив внизу окна диалога. */}
+      {forkMode && (
+        <div className="fork-overlay">
+          <div className="fork-header">
+            <span className="fork-title">Выбор ветки</span>
+            <button className="fork-close-btn" onClick={closeForkMode}>✕</button>
+          </div>
+          <div className="fork-cards" ref={cardsRef}>
+            {forkCards.map((card, idx) => (
+              <div
+                key={card.nodeId}
+                className={`fork-card ${idx === forkActiveIdx ? "fork-card--active" : ""} ${card.isActive ? "fork-card--current" : ""}`}
+                onMouseEnter={() => setForkActiveIdx(idx)}
+                onClick={() => { if (editingNodeId !== card.nodeId) handleCardClick(idx); }}
+                onDoubleClick={() => handleCardDoubleClick(card.nodeId)}
+              >
+                {editingNodeId === card.nodeId ? (
+                  <input
+                    className="fork-card-edit"
+                    autoFocus
+                    value={editingText}
+                    onChange={e => setEditingText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { e.preventDefault(); saveEditing(); }
+                      else if (e.key === "Escape") { e.preventDefault(); cancelEditing(); }
+                    }}
+                    onBlur={saveEditing}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <>
+                    <span className="fork-card-name">{card.branchName}</span>
+                    {card.isActive && <span className="fork-card-badge">текущая</span>}
+
+                    <button
+                      className="fork-card-menu-btn"
+                      title="Меню ветки"
+                      onClick={e => {
+                        e.stopPropagation();
+                        setMenuNodeId(menuNodeId === card.nodeId ? null : card.nodeId);
+                      }}
+                    >
+                      ⋮
+                    </button>
+
+                    {menuNodeId === card.nodeId && (
+                      <div className="fork-card-menu" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => startEditing(card.nodeId)}>Редактировать</button>
+                        <button
+                          onClick={() => deleteCardBranch(card.nodeId)}
+                          style={{ color: "#c0392b" }}
+                        >
+                          Удалить ветку
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="fork-hint">←/→ или мышь · Ctrl+←/→ — к краю · Enter / ↓ / клик — войти в ветку · Ctrl+↑/↓ — дальше по дереву · F2 — переименовать</div>
+        </div>
+      )}
+
+      {/* Поле ввода: единый composer с тянущейся верхней границей и переносом
+          слов. В режиме ветвления — префикс «Альтернативный запрос:».
+          В режиме развилки прячем — его место занимают плашки альтернатив. */}
+      {!forkMode && (
+      <div
+        className={`composer ${branchingFromId ? "composer--branch" : ""}`}
+        style={{ height: composerHeight }}
+      >
+        <div
+          className="composer-resizer"
+          onMouseDown={startComposerResize}
+          title="Потяните, чтобы изменить высоту поля"
+        />
+        <div className="composer-main">
+          <div className="composer-field">
+            {branchingFromId && (
+              <span className="composer-prefix">Альтернативный запрос:</span>
+            )}
+            <textarea
+              ref={composerRef}
+              className="composer-textarea"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitComposer();
+                } else if (e.key === "Escape" && branchingFromId) {
+                  e.preventDefault();
+                  cancelBranching();
+                }
+              }}
+              placeholder={
+                branchingFromId
+                  ? "Введите альтернативный запрос..."
+                  : "Введите сообщение... (Enter — отправить, Shift+Enter — перенос)"
+              }
+              disabled={loading || !dialogId || isBlocked}
+            />
+          </div>
+          <div className="composer-buttons">
+            {branchingFromId && (
+              <button
+                className="composer-cancel"
+                onClick={cancelBranching}
+                title="Отменить альтернативный запрос"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              className="composer-send"
+              onClick={submitComposer}
+              disabled={loading || !dialogId || isBlocked}
+            >
+              {branchingFromId ? "→" : "Отправить"}
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
     </main>
     <WidgetPanel facts={facts} capabilityDeps={capabilityDeps} />
+    </div>
     </div>
   );
 }

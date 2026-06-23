@@ -55,17 +55,19 @@ function toMarker(r: RawMarker): Marker {
   return { id: r.id, nodeId: r.node_id, label: r.label, comment: r.comment };
 }
 
+// Rust-форма {node_id, marker_id?, label?, is_leaf} -> контракт {nodeId, kind, label}.
+// kind: размечен маркером -> 'marker' (даже если узел заодно лист — маркер
+// приоритетнее для подписи); иначе 'leaf'. label: имя маркера, иначе запасная
+// подпись листа (у листа без маркера имени нет — D-059). types.ts требует
+// label: string (non-null), поэтому null здесь не пропускаем.
 function toReachableEnd(r: RawReachableEnd): ReachableEnd {
-  return {
-    nodeId: r.node_id,
-    markerId: r.marker_id,
-    label: r.label,
-    isLeaf: r.is_leaf,
-  };
+  const kind: ReachableEnd['kind'] = r.marker_id ? 'marker' : 'leaf';
+  const label = r.label ?? 'лист';
+  return { nodeId: r.node_id, kind, label };
 }
 
 // DbNode -> NodeView: курированная проекция (пока в адаптере, потом в ядре).
-// content -> text; hasMarker DbNode не несёт -> MVP false.
+// content -> text; метки DbNode не несёт -> пустой markers.
 // TODO(core projection): при D-078 приватные диапазоны ДОЛЖНЫ вырезаться в ЯДРЕ
 // (отдельной командой/флагом), не в этом адаптере — иначе приватный контент
 // долетает до фронта плагина до вырезания.
@@ -75,7 +77,7 @@ function dbNodeToView(r: RawDbNode): NodeView {
     parentId: r.parent_id,
     nodeType: r.node_type,
     text: r.content,
-    hasMarker: false,
+    markers: [], // resolveLinearRange отдаёт текст диапазона; метки тут не нужны
   };
 }
 
@@ -86,6 +88,10 @@ function dbNodeToView(r: RawDbNode): NodeView {
 export interface CapabilityDeps {
   onFocus: (nodeId: string) => void;       // намерение в центр (D-072), исполняет App
   getActiveDialogId: () => string | null;  // лениво: активный диалог в момент вызова
+  // дерево изменилось ядровой операцией плагина (напр. attach сжатия сдвинул
+  // курсор на заглушку под S) — App перечитывает активную ветку. Координация
+  // панель<->центр, как onFocus; плагин про это не знает.
+  onTreeChanged: () => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -139,17 +145,21 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
         endNodeId: string;
         summaryText: string;
         placeholderText: string | null;
+        modelId: string | null;
         provenance: CompressionProvenance;
       }): Promise<void> {
-        // Команда появится при реализации compression/mod.rs (D-060/061/065).
-        // Имена аргументов привести к будущей сигнатуре cmd_attach_compressed.
+        // cmd_attach_compressed (compression/mod.rs): создаёт S + заглушку +
+        // extra.compression (D-060/061/065) + провенанс модели на S (D-088).
         await invoke<void>('cmd_attach_compressed', {
           startNodeId: args.startNodeId,
           endNodeId: args.endNodeId,
           summaryText: args.summaryText,
           placeholderText: args.placeholderText,
+          modelId: args.modelId, // D-088: модель-уплотнитель (null у заглушки)
           provenance: args.provenance, // непрозрачно в extra.compression (D-065)
         });
+        // Курсор уехал на заглушку под S — просим App перечитать ветку.
+        deps.onTreeChanged();
       },
     },
 
@@ -161,6 +171,19 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
           `model.call(role="${role}")`,
           'опосредованный вызов модели по роли появится со слоем ролей (v0.2)',
         );
+      },
+    },
+
+    // -- secrets: API-ключи плагинов в системном keychain ядра ---------------
+    secrets: {
+      async set(providerId: string, apiKey: string): Promise<void> {
+        await invoke<void>('cmd_set_api_key', { providerId, apiKey });
+      },
+      async get(providerId: string): Promise<string | null> {
+        return invoke<string | null>('cmd_get_api_key', { providerId });
+      },
+      async delete(providerId: string): Promise<void> {
+        await invoke<void>('cmd_delete_api_key', { providerId });
       },
     },
 
