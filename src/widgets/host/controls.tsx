@@ -6,6 +6,7 @@
 // поднимается через dispatch (TEA: см. types.ts).
 
 import type { ChangeEvent } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import type { ControlNode, WidgetMsg } from './types';
 
 export type Dispatch = (msg: WidgetMsg) => void;
@@ -123,6 +124,24 @@ export function renderControl(
           onClick={() => dispatch(node.onClick)}
         >
           {node.icon}
+        </button>
+      );
+
+    // Внешняя ссылка: открываем в системном браузере через opener-плагин Tauri
+    // (плагин не дёргает invoke напрямую — это делает хост).
+    case 'link':
+      return (
+        <button
+          className="widget-link"
+          key={key}
+          type="button"
+          onClick={() => {
+            void openUrl(node.href).catch((e) =>
+              console.error('openUrl failed:', e),
+            );
+          }}
+        >
+          {node.label}
         </button>
       );
 

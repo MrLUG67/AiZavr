@@ -4,13 +4,15 @@ import "./App.css";
 import { WidgetPanel } from "./widgets/host/WidgetPanel";
 import { MenuBar } from "./components/MenuBar";
 import { NotebooksPanel } from "./components/NotebooksPanel";
-import type { WidgetFacts, NodeView, ModelFacts } from "./widgets/host/types";
+import type { WidgetFacts, NodeView, ModelFacts, HelpDoc } from "./widgets/host/types";
 import type { CapabilityDeps } from "./widgets/host/capabilities";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   getActiveLlmProvider,
   getActiveLlmProviderId,
   subscribeLlmProvider,
 } from "./widgets/llm/registry";
+import { t, useLang } from "./i18n";
 
 // ---------------------------------------------------------------------------
 // Типы
@@ -40,6 +42,7 @@ interface MarkerData {
 interface DbDialog {
   id: string;
   title: string;
+  notebook_id: string | null;
   root_node_id: string | null;
   active_leaf_id: string | null;
 }
@@ -55,6 +58,13 @@ interface DbNode {
   branch_name: string | null;
   last_visited_leaf_id: string | null;
   is_deleted: boolean;
+}
+
+interface Notebook {
+  id: string;
+  parent_notebook_id: string | null;
+  name: string;
+  kind: string;
 }
 
 interface SendResult {
@@ -137,6 +147,7 @@ function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
 // ---------------------------------------------------------------------------
 
 function App() {
+  useLang(); // перерисовка при смене языка
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -145,6 +156,15 @@ function App() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [dialogId, setDialogId] = useState<string | null>(null);
   const [lastNodeId, setLastNodeId] = useState<string | null>(null);
+
+  // Дерево блокнотов/бесед — единый источник правды (его читают и шапка, и
+  // левая панель). Панель владеет UI-состоянием (раскрытие/меню), но не данными.
+  const [notebooks, setNotebooks] = useState<Notebook[]>([]);
+  const [dialogs, setDialogs] = useState<DbDialog[]>([]);
+
+  // Редактирование заголовка беседы в шапке (двойной клик).
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   // Граница ПРОСМОТРА (нижний частично видимый узел). Эфемерна: не в БД,
   // отдельна от рабочего курсора lastNodeId (скролл не двигает рабочую позицию).
   // Дефолт — последний узел (низ ленты при свежей загрузке).
@@ -203,6 +223,8 @@ function App() {
   const [activeLlmProviderId, setActiveLlmProviderId] = useState<string | null>(
     () => getActiveLlmProviderId(),
   );
+  // Справка плагина в центре (вместо диалога). null — скрыта.
+  const [helpDoc, setHelpDoc] = useState<HelpDoc | null>(null);
 
   // ---------------------------------------------------------------------------
   // Инициализация
@@ -431,6 +453,9 @@ function App() {
       // Ядровая операция плагина изменила дерево (attach сжатия сдвинул курсор
       // на заглушку под S) — перечитываем активную ветку.
       onTreeChanged: () => { if (dialogId) loadBranch(dialogId); },
+      // Плагин просит показать справку в центре — кладём в состояние, рендерим
+      // оверлей поверх диалога с кнопкой «Закрыть».
+      onOpenHelp: (doc) => setHelpDoc(doc),
     }),
     [onFocus, dialogId],
   );
@@ -439,15 +464,69 @@ function App() {
   // Диалог
   // ---------------------------------------------------------------------------
 
+  // Перечитать дерево блокнотов и список бесед (структурные изменения).
+  const reloadTree = useCallback(async () => {
+    const [nbs, dls] = await Promise.all([
+      invoke<Notebook[]>("cmd_list_notebooks"),
+      invoke<DbDialog[]>("cmd_list_dialogs"),
+    ]);
+    setNotebooks(nbs);
+    setDialogs(dls);
+  }, []);
+
+  // Точечно обновить имя беседы в общем списке — мгновенно и без перестроения
+  // дерева (раскрытые ветки остаются раскрытыми). Используют и шапка, и панель.
+  const patchDialogTitle = useCallback((id: string, title: string) => {
+    setDialogs((prev) => prev.map((d) => (d.id === id ? { ...d, title } : d)));
+  }, []);
+
   async function initDialog() {
-    const dialogs = await invoke<DbDialog[]>("cmd_list_dialogs");
-    if (dialogs.length > 0) {
-      const d = dialogs[0];
+    // Беседы живут в блокнотах и создаются из левой панели. На старте грузим
+    // дерево и открываем самую свежую беседу вне корзины (если есть); иначе
+    // ждём выбора в панели «Блокноты» — ничего не автосоздаём.
+    const [nbs, dls] = await Promise.all([
+      invoke<Notebook[]>("cmd_list_notebooks"),
+      invoke<DbDialog[]>("cmd_list_dialogs"),
+    ]);
+    setNotebooks(nbs);
+    setDialogs(dls);
+    const d = dls.find((x) => x.notebook_id !== "trash") ?? null;
+    if (d) {
       setDialogId(d.id);
       await loadBranch(d.id);
+    }
+  }
+
+  // Сохранить имя беседы из шапки. Пустое или неизменное — игнор.
+  async function commitTitle() {
+    const title = titleDraft.trim();
+    setEditingTitle(false);
+    if (!dialogId || !title) return;
+    const cur = dialogs.find((d) => d.id === dialogId)?.title ?? "";
+    if (title === cur) return;
+    try {
+      await invoke("cmd_update_dialog_title", { dialogId, title });
+      patchDialogTitle(dialogId, title);
+    } catch (e) {
+      console.error("update_dialog_title failed:", e);
+    }
+  }
+
+  // Открыть беседу из панели блокнотов (или очистить центр при null).
+  // Выходим из служебных режимов, чтобы не показать чужую развилку/ветки.
+  async function openDialog(id: string | null) {
+    setForkMode(false);
+    setForkNodeId(null);
+    setForkCards([]);
+    setDeletedMode(false);
+    setBranchingFromId(null);
+    setSendError(null);
+    setDialogId(id);
+    if (id) {
+      await loadBranch(id);
     } else {
-      const d = await invoke<DbDialog>("cmd_create_dialog", { title: "New conversation", notebookId: null });
-      setDialogId(d.id);
+      setMessages([]);
+      setLastNodeId(null);
     }
   }
 
@@ -504,9 +583,10 @@ function App() {
     // не сбрасывается.
     messageEls.current.length = restored.length;
 
-    if (branch.length > 0) {
-      setLastNodeId(branch[branch.length - 1].id);
-    }
+    // Рабочий курсор = лист активной ветки. Для ПУСТОЙ беседы — null (а не
+    // протухший узел прошлой беседы): иначе первый запрос новой беседы прицепится
+    // как parent к узлу старой, и get_branch уйдёт по родителям в чужое дерево.
+    setLastNodeId(branch.length > 0 ? branch[branch.length - 1].id : null);
   }
 
   // ---------------------------------------------------------------------------
@@ -932,7 +1012,7 @@ function App() {
       const llmMessages = buildLlmMessages(branch);
       const provider = getActiveLlmProvider();
       if (!provider?.isReady()) {
-        throw new Error("LLM-плагин не настроен. Укажите API-ключ в виджете OpenRouter.");
+        throw new Error(t("app.error.llmNotConfigured"));
       }
       const response = await provider.generateResponse(llmMessages, "main_dialog");
 
@@ -980,7 +1060,7 @@ function App() {
       const llmMessages = buildLlmMessages(branch);
       const provider = getActiveLlmProvider();
       if (!provider?.isReady()) {
-        throw new Error("LLM-плагин не настроен. Укажите API-ключ в виджете OpenRouter.");
+        throw new Error(t("app.error.llmNotConfigured"));
       }
       const response = await provider.generateResponse(llmMessages, "main_dialog");
 
@@ -1034,15 +1114,80 @@ const facts: WidgetFacts = {
     <div className="app-root">
     <MenuBar />
     <div className="app-shell">
-    <NotebooksPanel />
+    <NotebooksPanel
+      notebooks={notebooks}
+      dialogs={dialogs}
+      activeDialogId={dialogId}
+      onOpenDialog={openDialog}
+      reloadTree={reloadTree}
+      patchDialogTitle={patchDialogTitle}
+    />
     <main className="container">
-      <h1>AiZavr</h1>
+      {helpDoc && (
+        <div className="help-doc" role="dialog" aria-label={helpDoc.title}>
+          <div className="help-doc-head">
+            <h2 className="help-doc-title">{helpDoc.title}</h2>
+            <button
+              className="help-doc-close"
+              onClick={() => setHelpDoc(null)}
+              title={t("app.help.closeTitle")}
+            >
+              ✕ {t("common.close")}
+            </button>
+          </div>
+          <div className="help-doc-body">
+            {helpDoc.paragraphs.map((p, i) => (
+              <p key={i} className="help-doc-para">{p}</p>
+            ))}
+            {helpDoc.link && (
+              <button
+                className="help-doc-link"
+                onClick={() => {
+                  void openUrl(helpDoc.link!.href).catch((e) =>
+                    console.error("openUrl failed:", e),
+                  );
+                }}
+              >
+                ↗ {helpDoc.link.label}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {dialogId ? (
+        editingTitle ? (
+          <input
+            className="dialog-title-edit"
+            autoFocus
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); commitTitle(); }
+              else if (e.key === "Escape") { e.preventDefault(); setEditingTitle(false); }
+            }}
+            onBlur={commitTitle}
+          />
+        ) : (
+          <h1
+            className="dialog-title"
+            title={t("app.dialogTitle.editHint")}
+            onDoubleClick={() => {
+              setTitleDraft(dialogs.find((d) => d.id === dialogId)?.title ?? "");
+              setEditingTitle(true);
+            }}
+          >
+            {dialogs.find((d) => d.id === dialogId)?.title || t("common.untitled")}
+          </h1>
+        )
+      ) : (
+        <h1 className="dialog-title dialog-title--empty">{t("app.noDialog")}</h1>
+      )}
 
       {/* Режим восстановления удалённых веток (D-050) */}
       {deletedMode && (
         <div className="deleted-overlay">
           <div className="fork-header">
-            <span className="deleted-title">Удалённые ветки</span>
+            <span className="deleted-title">{t("app.deleted.title")}</span>
             <button className="fork-close-btn" onClick={closeDeletedMode}>✕</button>
           </div>
           <div className="fork-cards">
@@ -1053,7 +1198,7 @@ const facts: WidgetFacts = {
                   className="restore-btn"
                   onClick={() => restoreBranch(card.nodeId)}
                 >
-                  Восстановить
+                  {t("app.deleted.restore")}
                 </button>
               </div>
             ))}
@@ -1077,7 +1222,7 @@ const facts: WidgetFacts = {
                 data-msg-idx={i}
               >
                 <div className="message-content message-content--unanswered">
-                  <p className="unanswered-note">Ответ не получен</p>
+                  <p className="unanswered-note">{t("app.unanswered")}</p>
                   {i === messages.length - 1 && sendError && (
                     <p className="unanswered-error">{sendError}</p>
                   )}
@@ -1097,7 +1242,7 @@ const facts: WidgetFacts = {
                 data-msg-idx={i}
               >
                 <div className="message-content message-content--compressed">
-                  <div className="compressed-badge">⊟ Уплотнённый фрагмент</div>
+                  <div className="compressed-badge">⊟ {t("app.compressed.badge")}</div>
                   <p>{m.content}</p>
                 </div>
               </div>
@@ -1133,7 +1278,7 @@ const facts: WidgetFacts = {
                   {visibleCount > 1 && (
                     <button
                       className="fork-btn"
-                      title={`Развилка (${visibleCount} ветки)`}
+                      title={t("app.fork.title", { count: visibleCount })}
                       onClick={() => openForkMode(m.nodeId)}
                     >
                       ⑂
@@ -1143,7 +1288,7 @@ const facts: WidgetFacts = {
                   {m.deletedChildrenCount > 0 && (
                     <button
                       className="fork-btn--deleted"
-                      title={`Удалённые ветки: ${m.deletedChildrenCount}`}
+                      title={t("app.deleted.countTitle", { count: m.deletedChildrenCount })}
                       onClick={() => openDeletedMode(m.nodeId)}
                     >
                       ⑂{m.deletedChildrenCount > 1 ? ` ×${m.deletedChildrenCount}` : ""}
@@ -1153,7 +1298,7 @@ const facts: WidgetFacts = {
                   {m.childrenCount > 0 && (
                     <button
                       className={`branch-btn ${branchingFromId === m.nodeId ? "branch-btn--active" : ""}`}
-                      title="Создать ветку"
+                      title={t("app.branch.create")}
                       onClick={() => toggleBranching(m.nodeId)}
                     >
                       +
@@ -1163,7 +1308,7 @@ const facts: WidgetFacts = {
                   {m.markers.length === 0 ? (
                     <button
                       className="marker-btn"
-                      title="Поставить маркер"
+                      title={t("app.marker.set")}
                       onClick={() => {
                         setMarkingNodeId(markingNodeId === m.nodeId ? null : m.nodeId);
                         setMarkerComment("");
@@ -1175,7 +1320,7 @@ const facts: WidgetFacts = {
                     <>
                       <button
                         className="marker-btn marker-btn--active"
-                        title={`Снять маркер ${m.markers[0].label}`}
+                        title={t("app.marker.remove", { label: m.markers[0].label })}
                         onClick={() => deleteMarker(m.markers[0].id)}
                       >
                         ⚑ {m.markers[0].label}
@@ -1202,7 +1347,7 @@ const facts: WidgetFacts = {
                         m.markers[0].comment && (
                           <span
                             className="marker-comment"
-                            title="Двойной клик — редактировать"
+                            title={t("app.marker.editHint")}
                             onDoubleClick={() =>
                               startEditingMarker(m.markers[0].id, m.markers[0].comment)
                             }
@@ -1227,7 +1372,7 @@ const facts: WidgetFacts = {
                       if (e.key === "Enter") { e.preventDefault(); createMarker(m.nodeId); }
                       else if (e.key === "Escape") { e.preventDefault(); setMarkingNodeId(null); }
                     }}
-                    placeholder="Комментарий (необязательно)..."
+                    placeholder={t("app.marker.commentPlaceholder")}
                   />
                   <button onClick={() => createMarker(m.nodeId)}>✓</button>
                   <button onClick={() => setMarkingNodeId(null)}>✕</button>
@@ -1237,15 +1382,15 @@ const facts: WidgetFacts = {
             </div>
           );
         })}
-        {loading && <p className="loading">Думаю...</p>}
+        {loading && <p className="loading">{t("app.thinking")}</p>}
       </div>
 
         {/* Стрелка вниз: активна, когда пользователь отлистал вверх. */}
         <button
           className={`scroll-bottom-btn ${stickToBottom ? "" : "is-visible"}`}
           onClick={scrollToBottom}
-          title="К последней строке"
-          aria-label="К последней строке"
+          title={t("app.scrollBottom")}
+          aria-label={t("app.scrollBottom")}
         >
           ↓
         </button>
@@ -1255,7 +1400,7 @@ const facts: WidgetFacts = {
       {sendError && !loading && (
         <div className="send-error" role="alert">
           <span className="send-error-text">⚠ {sendError}</span>
-          <button className="send-error-close" onClick={() => setSendError(null)} title="Скрыть">×</button>
+          <button className="send-error-close" onClick={() => setSendError(null)} title={t("common.hide")}>×</button>
         </div>
       )}
 
@@ -1263,7 +1408,7 @@ const facts: WidgetFacts = {
       {forkMode && (
         <div className="fork-overlay">
           <div className="fork-header">
-            <span className="fork-title">Выбор ветки</span>
+            <span className="fork-title">{t("app.fork.choose")}</span>
             <button className="fork-close-btn" onClick={closeForkMode}>✕</button>
           </div>
           <div className="fork-cards" ref={cardsRef}>
@@ -1291,11 +1436,11 @@ const facts: WidgetFacts = {
                 ) : (
                   <>
                     <span className="fork-card-name">{card.branchName}</span>
-                    {card.isActive && <span className="fork-card-badge">текущая</span>}
+                    {card.isActive && <span className="fork-card-badge">{t("app.fork.current")}</span>}
 
                     <button
                       className="fork-card-menu-btn"
-                      title="Меню ветки"
+                      title={t("app.fork.menu")}
                       onClick={e => {
                         e.stopPropagation();
                         setMenuNodeId(menuNodeId === card.nodeId ? null : card.nodeId);
@@ -1306,12 +1451,12 @@ const facts: WidgetFacts = {
 
                     {menuNodeId === card.nodeId && (
                       <div className="fork-card-menu" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => startEditing(card.nodeId)}>Редактировать</button>
+                        <button onClick={() => startEditing(card.nodeId)}>{t("common.edit")}</button>
                         <button
                           onClick={() => deleteCardBranch(card.nodeId)}
                           style={{ color: "#c0392b" }}
                         >
-                          Удалить ветку
+                          {t("app.fork.deleteBranch")}
                         </button>
                       </div>
                     )}
@@ -1320,7 +1465,7 @@ const facts: WidgetFacts = {
               </div>
             ))}
           </div>
-          <div className="fork-hint">←/→ или мышь · Ctrl+←/→ — к краю · Enter / ↓ / клик — войти в ветку · Ctrl+↑/↓ — дальше по дереву · F2 — переименовать</div>
+          <div className="fork-hint">{t("app.fork.hint")}</div>
         </div>
       )}
 
@@ -1335,12 +1480,12 @@ const facts: WidgetFacts = {
         <div
           className="composer-resizer"
           onMouseDown={startComposerResize}
-          title="Потяните, чтобы изменить высоту поля"
+          title={t("app.composer.resizeHint")}
         />
         <div className="composer-main">
           <div className="composer-field">
             {branchingFromId && (
-              <span className="composer-prefix">Альтернативный запрос:</span>
+              <span className="composer-prefix">{t("app.composer.altPrefix")}</span>
             )}
             <textarea
               ref={composerRef}
@@ -1358,8 +1503,8 @@ const facts: WidgetFacts = {
               }}
               placeholder={
                 branchingFromId
-                  ? "Введите альтернативный запрос..."
-                  : "Введите сообщение... (Enter — отправить, Shift+Enter — перенос)"
+                  ? t("app.composer.altPlaceholder")
+                  : t("app.composer.placeholder")
               }
               disabled={loading || !dialogId || isBlocked}
             />
@@ -1369,7 +1514,7 @@ const facts: WidgetFacts = {
               <button
                 className="composer-cancel"
                 onClick={cancelBranching}
-                title="Отменить альтернативный запрос"
+                title={t("app.composer.cancelAlt")}
               >
                 ✕
               </button>
@@ -1379,7 +1524,7 @@ const facts: WidgetFacts = {
               onClick={submitComposer}
               disabled={loading || !dialogId || isBlocked}
             >
-              {branchingFromId ? "→" : "Отправить"}
+              {branchingFromId ? "→" : t("app.composer.send")}
             </button>
           </div>
         </div>

@@ -194,7 +194,18 @@ export interface WidgetCapabilities {
   // намерение в центральный поток — координация панель<->центр (D-072).
   ui: {
     focus(nodeId: string): void;
+    // показать справку плагина в ЦЕНТРАЛЬНОЙ области (вместо текущего диалога),
+    // с кнопкой закрытия. Рендерит App; в тесном боксе плагина место не на это.
+    openHelp(doc: HelpDoc): void;
   };
+}
+
+// Справка плагина, показываемая в центре (D-072). Структурные данные, не вёрстка:
+// заголовок, абзацы и опциональная внешняя ссылка. Рисует App единообразно.
+export interface HelpDoc {
+  title: string;
+  paragraphs: string[];
+  link?: { label: string; href: string };
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +236,8 @@ export type ControlNode =
   | { kind: 'list'; items: ListItem[]; onSelect: WidgetMsg }
   | { kind: 'button'; label: string; disabled?: boolean; primary?: boolean; onClick: WidgetMsg }
   | { kind: 'iconButton'; icon: string; title?: string; onClick: WidgetMsg }
+  // Внешняя ссылка: открывается в системном браузере (хост через opener-плагин).
+  | { kind: 'link'; label: string; href: string }
   | { kind: 'checkbox'; label: string; checked: boolean; disabled?: boolean; onChange: WidgetMsg }
   | { kind: 'segmented'; options: SegOption[]; value: string; onChange: WidgetMsg }
   | { kind: 'preview'; text: string; editable?: boolean; inputType?: 'text' | 'password'; onChange?: WidgetMsg }

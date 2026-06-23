@@ -5,8 +5,10 @@ mod tree;
 mod keychain;
 mod markers;
 mod compression;
+mod notebooks;
 
 use db::{DbDialog, DbNode};
+use notebooks::DbNotebook;
 
 struct AppState {
     db: sqlx::SqlitePool,
@@ -396,6 +398,95 @@ async fn cmd_get_compression_meta(
 }
 
 // ---------------------------------------------------------------------------
+// Блокноты (сессия 11) — организация бесед
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_list_notebooks(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<DbNotebook>, String> {
+    notebooks::list_notebooks(&state.db)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_create_notebook(
+    state: tauri::State<'_, AppState>,
+    parent_id: String,
+    name: String,
+) -> Result<DbNotebook, String> {
+    notebooks::create_notebook(&state.db, &parent_id, &name).await
+}
+
+#[tauri::command]
+async fn cmd_rename_notebook(
+    state: tauri::State<'_, AppState>,
+    notebook_id: String,
+    name: String,
+) -> Result<(), String> {
+    notebooks::rename_notebook(&state.db, &notebook_id, &name).await
+}
+
+/// Переподчинить блокнот (reparent) с проверкой цикла/глубины/ветвления.
+#[tauri::command]
+async fn cmd_move_notebook(
+    state: tauri::State<'_, AppState>,
+    notebook_id: String,
+    new_parent_id: String,
+) -> Result<(), String> {
+    notebooks::move_notebook(&state.db, &notebook_id, &new_parent_id).await
+}
+
+/// Удалить блокнот = мягкий перенос в корзину (со всем поддеревом и беседами).
+#[tauri::command]
+async fn cmd_delete_notebook(
+    state: tauri::State<'_, AppState>,
+    notebook_id: String,
+) -> Result<(), String> {
+    notebooks::delete_notebook(&state.db, &notebook_id).await
+}
+
+#[tauri::command]
+async fn cmd_list_dialogs_in_notebook(
+    state: tauri::State<'_, AppState>,
+    notebook_id: String,
+) -> Result<Vec<DbDialog>, String> {
+    notebooks::list_dialogs_in_notebook(&state.db, &notebook_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Создать беседу в блокноте (нельзя в корне/корзине; лимит 1024).
+#[tauri::command]
+async fn cmd_create_dialog_in_notebook(
+    state: tauri::State<'_, AppState>,
+    notebook_id: String,
+    title: String,
+) -> Result<DbDialog, String> {
+    notebooks::create_dialog_in_notebook(&state.db, &notebook_id, &title).await
+}
+
+/// Переподчинить беседу в другой блокнот.
+#[tauri::command]
+async fn cmd_move_dialog(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    new_notebook_id: String,
+) -> Result<(), String> {
+    notebooks::move_dialog(&state.db, &dialog_id, &new_notebook_id).await
+}
+
+/// Удалить беседу = мягкий перенос в корзину.
+#[tauri::command]
+async fn cmd_delete_dialog(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<(), String> {
+    notebooks::delete_dialog(&state.db, &dialog_id).await
+}
+
+// ---------------------------------------------------------------------------
 // Keychain
 // ---------------------------------------------------------------------------
 
@@ -471,6 +562,15 @@ pub fn run() {
             cmd_resolve_linear_range,
             cmd_attach_compressed,
             cmd_get_compression_meta,
+            cmd_list_notebooks,
+            cmd_create_notebook,
+            cmd_rename_notebook,
+            cmd_move_notebook,
+            cmd_delete_notebook,
+            cmd_list_dialogs_in_notebook,
+            cmd_create_dialog_in_notebook,
+            cmd_move_dialog,
+            cmd_delete_dialog,
             cmd_set_api_key,
             cmd_get_api_key,
             cmd_delete_api_key,

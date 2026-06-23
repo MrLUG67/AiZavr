@@ -63,6 +63,29 @@ h1 {
   border-bottom: 1px solid rgba(0,0,0,0.1);
 }
 
+.dialog-title {
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dialog-title--empty { color: #999; font-style: italic; cursor: default; }
+
+.dialog-title-edit {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 1.1em;
+  font-weight: 700;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 2px solid rgba(56,121,217,0.7);
+  background: rgba(56,121,217,0.06);
+  color: #0f0f0f;
+  outline: none;
+}
+
 /* ---------------------------------------------------------------------------
    Root layout: menu bar (top) + shell (notebooks | container | widgets)
 --------------------------------------------------------------------------- */
@@ -144,6 +167,18 @@ h1 {
   flex-shrink: 0;
   color: #396cd8;
   font-size: 12px;
+}
+.menu-dropdown-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(0,0,0,0.1);
+}
+.menu-dropdown-label {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8a8a8a;
 }
 
 /* ---------------------------------------------------------------------------
@@ -239,6 +274,140 @@ h1 {
   color: #999;
   user-select: none;
 }
+
+/* ---------------------------------------------------------------------------
+   Notebooks tree (rows inside the left panel)
+--------------------------------------------------------------------------- */
+
+.nb-node { display: block; }
+
+.nb-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding-right: 6px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: #2a2a2a;
+  cursor: default;
+  position: relative;
+}
+.nb-row:hover { background: rgba(0,0,0,0.05); }
+.nb-row--dialog { cursor: pointer; }
+.nb-row--active { background: rgba(56,121,217,0.14); }
+.nb-row--active:hover { background: rgba(56,121,217,0.2); }
+.nb-row--system .nb-name { font-weight: 600; }
+.nb-row--droptarget { outline: 2px dashed rgba(56,121,217,0.6); outline-offset: -2px; background: rgba(56,121,217,0.08); }
+
+.nb-twisty {
+  flex-shrink: 0;
+  width: 16px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+}
+.nb-twisty:hover { color: #0f0f0f; border-color: transparent; }
+
+.nb-icon { flex-shrink: 0; font-size: 12px; width: 16px; text-align: center; }
+.nb-icon--dialog { opacity: 0.8; }
+
+.nb-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.nb-actions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+.nb-row:hover .nb-actions { display: flex; }
+.nb-actions--open { display: flex; }
+.nb-act {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+.nb-act:hover { background: rgba(0,0,0,0.1); color: #0f0f0f; border-color: transparent; }
+
+.nb-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+}
+.nb-menu button {
+  background: none;
+  border: none;
+  box-shadow: none;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #2a2a2a;
+  cursor: pointer;
+}
+.nb-menu button:hover { background: rgba(0,0,0,0.07); border-color: transparent; }
+.nb-menu-danger { color: #c0392b !important; }
+
+.nb-edit {
+  flex: 1;
+  font-size: 13px;
+  padding: 2px 6px;
+  border: 1px solid rgba(56,121,217,0.6);
+  border-radius: 4px;
+  background: #fff;
+  color: #0f0f0f;
+  outline: none;
+}
+
+.nb-error {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #8a1f1f;
+  background: rgba(192,57,43,0.1);
+  border: 1px solid rgba(192,57,43,0.25);
+  border-radius: 6px;
+}
+.nb-error span { flex: 1; line-height: 1.35; }
+.nb-error button {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: #8a1f1f;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 0 2px;
+}
+.nb-error button:hover { color: #c0392b; border-color: transparent; }
 
 /* ---------------------------------------------------------------------------
    Fork overlay
@@ -681,6 +850,34 @@ h1 {
   font-size: 0.9em;
 }
 
+/* Справка плагина в центре (D-072): занимает область диалога, кнопка «Закрыть». */
+.help-doc {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column;
+  padding: 20px 24px;
+  /* бледно-жёлтый фон — чтобы справка визуально отличалась от диалога. */
+  background: #fdf6d8;
+}
+.help-doc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.15); padding-bottom: 12px;
+}
+.help-doc-title { margin: 0; font-size: 18px; }
+.help-doc-close {
+  flex-shrink: 0; font-size: 13px; padding: 6px 12px; border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.04); cursor: pointer;
+}
+.help-doc-close:hover { background: rgba(0,0,0,0.09); }
+.help-doc-body { display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
+.help-doc-para { margin: 0; font-size: 14px; line-height: 1.6; color: #333; }
+.help-doc-link {
+  align-self: flex-start; margin-top: 8px;
+  font-size: 14px; padding: 8px 14px; border-radius: 6px;
+  border: 1px solid #396cd8; background: #396cd8; color: #fff; cursor: pointer;
+}
+.help-doc-link:hover { background: #2f5bb8; }
+
 /* Ошибка отправки в LLM — видимая причина, не только консоль. */
 .send-error {
   display: flex;
@@ -833,6 +1030,8 @@ h1 {
   button:active { background-color: #0f0f0f69; }
 
   h1 { border-bottom-color: rgba(255,255,255,0.1); }
+  .dialog-title--empty { color: #888; }
+  .dialog-title-edit { background: rgba(97,160,255,0.12); color: #f0f0f0; border-bottom-color: rgba(97,160,255,0.7); }
 
   .message.assistant .message-content {
     background-color: rgba(255,255,255,0.08);
@@ -874,6 +1073,8 @@ h1 {
   }
   .menu-dropdown-item { color: #e6e6e6; }
   .menu-dropdown-item:hover { background: rgba(97,160,255,0.2); }
+  .menu-dropdown-sep { background: rgba(255,255,255,0.12); }
+  .menu-dropdown-label { color: #888; }
 
   .notebooks-panel,
   .notebooks-rail {
@@ -886,6 +1087,24 @@ h1 {
   .notebooks-rail-expand { color: #aaa; }
   .notebooks-rail-expand:hover { color: #fff; }
 
+  .nb-row { color: #ddd; }
+  .nb-row:hover { background: rgba(255,255,255,0.06); }
+  .nb-row--active { background: rgba(97,160,255,0.22); }
+  .nb-row--active:hover { background: rgba(97,160,255,0.3); }
+  .nb-row--droptarget { outline-color: rgba(97,160,255,0.7); background: rgba(97,160,255,0.12); }
+  .nb-twisty { color: #888; }
+  .nb-twisty:hover { color: #fff; }
+  .nb-act { color: #aaa; }
+  .nb-act:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nb-menu { background: #262626; border-color: rgba(255,255,255,0.15); box-shadow: 0 4px 14px rgba(0,0,0,0.5); }
+  .nb-menu button { color: #e6e6e6; }
+  .nb-menu button:hover { background: rgba(255,255,255,0.1); }
+  .nb-menu-danger { color: #ff7062 !important; }
+  .nb-edit { background: #2a2a2a; color: #f0f0f0; border-color: rgba(97,160,255,0.6); }
+  .nb-error { color: #ff9c8f; background: rgba(192,57,43,0.18); border-color: rgba(255,112,98,0.35); }
+  .nb-error button { color: #ff9c8f; }
+  .nb-error button:hover { color: #ff7062; }
+
   .scroll-bottom-btn {
     background: #1f1f1f;
     color: #61a0ff;
@@ -897,6 +1116,14 @@ h1 {
     color: #111;
     border-color: #61a0ff;
   }
+  /* тёмно-синий фон справки в тёмной теме — отличие от диалога. */
+  .help-doc { background: #16213e; }
+  .help-doc-head { border-bottom-color: rgba(255,255,255,0.18); }
+  .help-doc-para { color: #dde; }
+  .help-doc-close { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #ddd; }
+  .help-doc-close:hover { background: rgba(255,255,255,0.16); }
+  .help-doc-link { background: #61a0ff; border-color: #61a0ff; color: #111; }
+  .help-doc-link:hover { background: #4d8de6; }
   .send-error { background: rgba(255, 99, 99, 0.12); border-color: rgba(255, 99, 99, 0.3); }
   .send-error-text, .send-error-close, .unanswered-error { color: #ff8a8a; }
 
@@ -1145,6 +1372,12 @@ h1 {
   background: #396cd8; color: #fff; border-color: #396cd8;
 }
 .widget-button.is-primary:hover:not(:disabled) { background: #2f5bb8; }
+.widget-link {
+  background: none; border: none; box-shadow: none; cursor: pointer;
+  padding: 2px 0; text-align: left;
+  font-size: 12px; color: #396cd8; text-decoration: underline;
+}
+.widget-link:hover { color: #2f5bb8; }
 .widget-text { font-size: 12px; color: #333; }
 .widget-text.is-muted { color: #888; }
 .widget-indicator-track {
@@ -1254,6 +1487,8 @@ h1 {
   }
   .widget-button.is-primary { background: #61a0ff; border-color: #61a0ff; color: #111; }
   .widget-button.is-primary:hover:not(:disabled) { background: #4d8de6; }
+  .widget-link { color: #61a0ff; }
+  .widget-link:hover { color: #82b4ff; }
   .widget-indicator-track { background: rgba(255,255,255,0.1); }
   .widget-indicator-label { color: #bbb; }
 

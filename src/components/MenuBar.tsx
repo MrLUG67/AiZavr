@@ -3,8 +3,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { t, useLang, setLang, LANG_NAMES, type Lang } from "../i18n";
 
 type Theme = "light" | "dark";
+
+const LANGS: Lang[] = ["ru", "en"];
 
 function readTheme(): Theme {
   const v = document.documentElement.getAttribute("data-theme");
@@ -20,11 +23,17 @@ export function MenuBar(): React.ReactElement {
   // Какое верхнее меню сейчас раскрыто (по id). null — всё закрыто.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() => readTheme());
+  const lang = useLang();
   const barRef = useRef<HTMLDivElement>(null);
 
   function selectTheme(next: Theme) {
     applyTheme(next);
     setTheme(next);
+    setOpenMenu(null);
+  }
+
+  function selectLang(next: Lang) {
+    setLang(next);
     setOpenMenu(null);
   }
 
@@ -64,12 +73,12 @@ export function MenuBar(): React.ReactElement {
           onClick={() => setOpenMenu(m => (m === "file" ? null : "file"))}
           onMouseEnter={() => { if (openMenu) setOpenMenu("file"); }}
         >
-          Файл
+          {t("menu.file")}
         </button>
         {openMenu === "file" && (
           <div className="menu-dropdown">
             <button className="menu-dropdown-item" onClick={exitApp}>
-              Выход
+              {t("menu.exit")}
             </button>
           </div>
         )}
@@ -81,18 +90,30 @@ export function MenuBar(): React.ReactElement {
           onClick={() => setOpenMenu(m => (m === "settings" ? null : "settings"))}
           onMouseEnter={() => { if (openMenu) setOpenMenu("settings"); }}
         >
-          Настройки
+          {t("menu.settings")}
         </button>
         {openMenu === "settings" && (
           <div className="menu-dropdown">
             <button className="menu-dropdown-item" onClick={() => selectTheme("dark")}>
               <span className="menu-dropdown-check">{theme === "dark" ? "✓" : ""}</span>
-              Тёмная тема
+              {t("menu.darkTheme")}
             </button>
             <button className="menu-dropdown-item" onClick={() => selectTheme("light")}>
               <span className="menu-dropdown-check">{theme === "light" ? "✓" : ""}</span>
-              Светлая тема
+              {t("menu.lightTheme")}
             </button>
+            <div className="menu-dropdown-sep" />
+            <div className="menu-dropdown-label">{t("menu.language")}</div>
+            {LANGS.map((code) => (
+              <button
+                key={code}
+                className="menu-dropdown-item"
+                onClick={() => selectLang(code)}
+              >
+                <span className="menu-dropdown-check">{lang === code ? "✓" : ""}</span>
+                {LANG_NAMES[code]}
+              </button>
+            ))}
           </div>
         )}
       </div>

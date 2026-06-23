@@ -16,6 +16,7 @@ import type {
   NodeView,
   ChatMessage,
   CompressionProvenance,
+  HelpDoc,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +93,8 @@ export interface CapabilityDeps {
   // курсор на заглушку под S) — App перечитывает активную ветку. Координация
   // панель<->центр, как onFocus; плагин про это не знает.
   onTreeChanged: () => void;
+  // плагин просит показать свою справку в центре (вместо диалога). Исполняет App.
+  onOpenHelp: (doc: HelpDoc) => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -187,10 +190,13 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
       },
     },
 
-    // -- ui.focus: намерение в центр, исполняет App -------------------------
+    // -- ui.focus / ui.openHelp: намерения в центр, исполняет App -----------
     ui: {
       focus(nodeId: string): void {
         deps.onFocus(nodeId);
+      },
+      openHelp(doc): void {
+        deps.onOpenHelp(doc);
       },
     },
   };

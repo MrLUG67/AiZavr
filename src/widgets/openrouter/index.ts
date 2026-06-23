@@ -38,6 +38,8 @@ interface State {
   error: string | null;
 }
 
+const KEYS_URL = 'https://openrouter.ai/keys';
+
 function text(value: string, muted = false): ControlNode {
   return { kind: 'text', value, tone: muted ? 'muted' : 'normal' };
 }
@@ -132,12 +134,23 @@ function configOverlay(state: State): ControlNode {
   return {
     kind: 'overlay',
     children: [
-      text(
-        state.hasApiKey
-          ? 'Введите новый ключ, чтобы заменить текущий.'
-          : 'API-ключ OpenRouter (openrouter.ai/keys)',
-        true,
-      ),
+      {
+        kind: 'row',
+        children: [
+          text(
+            state.hasApiKey
+              ? 'Введите новый ключ, чтобы заменить текущий.'
+              : 'API-ключ OpenRouter',
+            true,
+          ),
+          {
+            kind: 'iconButton',
+            icon: '(?)',
+            title: 'Как получить API-ключ',
+            onClick: { type: 'openHelp' },
+          },
+        ],
+      },
       {
         kind: 'preview',
         text: state.apiKeyInput,
@@ -171,6 +184,21 @@ function configOverlay(state: State): ControlNode {
   };
 }
 
+// Пошаговая справка получения API-ключа OpenRouter — показывается в ЦЕНТРЕ
+// (cap.ui.openHelp), не в тесном боксе плагина.
+const HELP_DOC = {
+  title: 'Как получить API-ключ OpenRouter',
+  paragraphs: [
+    '1. Зарегистрируйтесь или войдите на openrouter.ai',
+    '2. Откройте раздел Keys (кнопка ниже)',
+    '3. Нажмите «Create Key» и задайте имя',
+    '4. Скопируйте ключ — он показывается только один раз',
+    '5. Вернитесь в AiZavr, вставьте ключ в поле и нажмите «Ок»',
+    '6. Пополните баланс в разделе Credits, иначе модели не будут отвечать',
+  ],
+  link: { label: 'Открыть openrouter.ai/keys', href: KEYS_URL },
+};
+
 export const openrouter: WidgetDef<State> = {
   manifest: {
     id: PLUGIN_ID,
@@ -180,7 +208,7 @@ export const openrouter: WidgetDef<State> = {
     order: 5,
     surface: 'panel',
     supportedModels: '*',
-    capabilities: ['secrets'],
+    capabilities: ['secrets', 'ui.focus'],
     author: 'core',
     version: PLUGIN_VERSION,
   },
@@ -337,6 +365,12 @@ export const openrouter: WidgetDef<State> = {
       const next = { ...state, configOpen: true, apiKeyInput: '', error: null };
       liveState.current = next;
       return next;
+    }
+
+    if (msg.type === 'openHelp') {
+      // Справка показывается в ЦЕНТРЕ через капабилити (исполняет App).
+      cap.ui.openHelp(HELP_DOC);
+      return state;
     }
 
     if (msg.type === 'configOk') {
