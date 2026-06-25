@@ -62,9 +62,11 @@ pub async fn create_marker(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "node not found".to_string())?;
 
-    if node.node_type != "assistant_message" {
+    // Инвариант D-058 расширен D-090: маркер допустим на A-узле (assistant_message)
+    // и на A0-анкоре корня (root_anchor) — там живёт корневой маркер #0.
+    if node.node_type != "assistant_message" && node.node_type != "root_anchor" {
         return Err(format!(
-            "marker allowed only on assistant_message, got '{}'",
+            "marker allowed only on assistant_message or root_anchor, got '{}'",
             node.node_type
         ));
     }
@@ -164,6 +166,16 @@ pub async fn delete_marker(pool: &SqlitePool, id: &str) -> Result<(), String> {
     let marker = get_marker(pool, id)
         .await?
         .ok_or_else(|| "marker not found".to_string())?;
+
+    // Корневой маркер #0 на A0-анкоре неудаляем — структурный якорь начала
+    // беседы (D-090). Опознаём по типу узла, а не по строке label.
+    let node = db::get_node(pool, &marker.node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "node not found".to_string())?;
+    if node.node_type == "root_anchor" {
+        return Err("cannot delete the root marker".to_string());
+    }
 
     if is_node_referenced_by_compression(pool, &marker.node_id).await? {
         return Err(

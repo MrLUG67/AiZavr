@@ -18,6 +18,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ControlTree, type Dispatch } from './controls';
+import { registerWidgetDispatch, unregisterWidgetDispatch } from './widgetDispatch';
 import type {
   WidgetDef,
   WidgetFacts,
@@ -117,6 +118,8 @@ export function WidgetHost<State>(props: {
   // по смыслу, перезапускать эффект на каждый рендер не нужно.
   useEffect(() => {
     dispatch({ type: '@@mount' });
+    registerWidgetDispatch(def.manifest.id, dispatch);
+    return () => unregisterWidgetDispatch(def.manifest.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

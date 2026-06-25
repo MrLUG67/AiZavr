@@ -41,6 +41,8 @@ pub struct DbDialog {
     pub updated_at: String,
 }
 
+pub const MAX_DIALOG_TAGS: usize = 7;
+
 /// Узел дерева — минимальная единица хранения.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DbNode {
@@ -178,6 +180,59 @@ pub async fn update_dialog_leaf(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_dialog_tags(
+    pool: &SqlitePool,
+    dialog_id: &str,
+) -> Result<Vec<String>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT tag
+         FROM dialog_tags
+         WHERE dialog_id = ?
+         ORDER BY tag ASC",
+    )
+    .bind(dialog_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|r| r.get("tag")).collect())
+}
+
+pub async fn set_dialog_tags(
+    pool: &SqlitePool,
+    dialog_id: &str,
+    tags: &[String],
+) -> Result<Vec<String>, String> {
+    let normalized = normalize_dialog_tags(tags)?;
+
+    let exists: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM dialogs WHERE id = ?")
+        .bind(dialog_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    if exists == 0 {
+        return Err("dialog not found".into());
+    }
+
+    let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
+    sqlx::query("DELETE FROM dialog_tags WHERE dialog_id = ?")
+        .bind(dialog_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    for tag in &normalized {
+        sqlx::query("INSERT INTO dialog_tags (dialog_id, tag) VALUES (?, ?)")
+            .bind(dialog_id)
+            .bind(tag)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().await.map_err(|e| e.to_string())?;
+    Ok(normalized)
 }
 
 // ---------------------------------------------------------------------------
@@ -549,4 +604,28 @@ fn node_from_row(r: sqlx::sqlite::SqliteRow) -> DbNode {
         children_count: r.get("children_count"),
         is_deleted: r.get::<i64, _>("is_deleted") != 0,
     }
+}
+
+fn normalize_dialog_tags(tags: &[String]) -> Result<Vec<String>, String> {
+    let mut normalized: Vec<String> = Vec::new();
+    for raw in tags {
+        if let Some(tag) = normalize_tag(raw) {
+            if !normalized.iter().any(|t| t == &tag) {
+                normalized.push(tag);
+            }
+        }
+    }
+
+    if normalized.len() > MAX_DIALOG_TAGS {
+        return Err(format!("too many tags: maximum is {MAX_DIALOG_TAGS}"));
+    }
+    Ok(normalized)
+}
+
+fn normalize_tag(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_start_matches('#');
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.to_lowercase())
 }

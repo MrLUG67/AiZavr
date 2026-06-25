@@ -45,11 +45,20 @@ function readNum(key: string, fallback: number): number {
   }
 }
 
+// Выбор активного LLM-провайдера (радио в хедере). Ядро владеет выбором; данные
+// готовит App из реестра LLM. Хедер показывает радио только для providesLlm.
+export interface LlmSelection {
+  activeId: string | null;       // кто сейчас обрабатывает диалог
+  readyIds: string[];            // готовые (валидный ключ) — только их можно выбрать
+  onSelect: (id: string) => void; // переключить активного (на готового)
+}
+
 export function WidgetPanel(props: {
   facts: WidgetFacts;
   capabilityDeps: CapabilityDeps;
+  llmSelection: LlmSelection;
 }): React.ReactElement {
-  const { facts, capabilityDeps } = props;
+  const { facts, capabilityDeps, llmSelection } = props;
 
   // Пин запоминается всегда; open инициализируется пином (закреплён -> открыта).
   const [pinned, setPinned] = useState(() => readBool(LS_PINNED, false));
@@ -160,23 +169,51 @@ export function WidgetPanel(props: {
         {widgets.map((def) => {
           const id = def.manifest.id;
           const isCollapsed = collapsed[id] ?? false;
+
+          // LLM-провайдер: радио активности в хедере. Выбрать можно только
+          // готового (валидный ключ) — иначе радио заблокировано (D: без коллизий).
+          const isLlm = def.manifest.providesLlm === true;
+          const isReady = isLlm && llmSelection.readyIds.includes(id);
+          const isActive = isLlm && llmSelection.activeId === id;
+
           return (
             <section
               key={id}
               className={`widget-section ${isCollapsed ? 'is-collapsed' : ''}`}
             >
-              <button
-                type="button"
-                className="widget-section-title"
-                onClick={() => toggleCollapsed(id)}
-                aria-expanded={!isCollapsed}
-                title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+              <div
+                className={`widget-section-head ${
+                  isActive ? 'is-active' : ''
+                } ${isLlm && !isReady ? 'is-not-ready' : ''}`}
               >
-                <span className="widget-section-caret">
-                  {isCollapsed ? '▼' : '▲'}
-                </span>
-                <span className="widget-section-name">{def.manifest.title}</span>
-              </button>
+                {isLlm && (
+                  <input
+                    type="radio"
+                    className="widget-section-radio"
+                    name="aizavr-llm-active"
+                    checked={isActive}
+                    disabled={!isReady}
+                    onChange={() => { if (isReady) llmSelection.onSelect(id); }}
+                    title={
+                      isReady
+                        ? 'Обрабатывать ответы этим плагином'
+                        : 'Плагин не готов: нет валидного API-ключа'
+                    }
+                  />
+                )}
+                <button
+                  type="button"
+                  className="widget-section-title"
+                  onClick={() => toggleCollapsed(id)}
+                  aria-expanded={!isCollapsed}
+                  title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+                >
+                  <span className="widget-section-caret">
+                    {isCollapsed ? '▼' : '▲'}
+                  </span>
+                  <span className="widget-section-name">{def.manifest.title}</span>
+                </button>
+              </div>
               {!isCollapsed && (
                 <div className="widget-section-content">
                   <WidgetHost def={def} facts={facts} cap={cap} />

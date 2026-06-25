@@ -1,6 +1,7 @@
-// Плагин OpenRouter — связь с LLM вынесена из ядра.
+// Плагин Google Gemini — бесплатный «на старте» доступ к LLM по API-ключу.
+// Ключ берётся бесплатно в Google AI Studio (вход гугл-аккаунтом), без оплаты.
 // Шестерёнка (левый верх) открывает оверлей настройки API-ключа.
-// Чекбокс «Использовать для ответов» выбирает активный LLM-плагин.
+// Активный провайдер выбирается радио в ХЕДЕРЕ панели (providesLlm).
 
 import type {
   WidgetDef,
@@ -18,27 +19,27 @@ import {
   setActiveLlmProvider,
   getActiveLlmProviderId,
 } from '../llm/registry';
-import { fetchModels, chatCompletion, type OpenRouterModel } from './api';
+import { fetchModels, chatCompletion, type GeminiModel } from './api';
 
-const PLUGIN_ID = 'openrouter';
+const PLUGIN_ID = 'gemini';
 const PLUGIN_VERSION = '0.1.0';
-const SECRET_PROVIDER_ID = 'openrouter';
-const LS_MODEL = 'openrouter.selectedModel';
-const DEFAULT_MODEL = 'anthropic/claude-haiku-4-5';
+const SECRET_PROVIDER_ID = 'gemini';
+const LS_MODEL = 'gemini.selectedModel';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 interface State {
   configOpen: boolean;
   apiKeyInput: string;
   hasApiKey: boolean;
   selectedModelId: string;
-  models: OpenRouterModel[];
+  models: GeminiModel[];
   loadingModels: boolean;
   pickingModel: boolean;
   modelFilter: string;
   error: string | null;
 }
 
-const KEYS_URL = 'https://openrouter.ai/keys';
+const KEYS_URL = 'https://aistudio.google.com/apikey';
 
 function text(value: string, muted = false): ControlNode {
   return { kind: 'text', value, tone: muted ? 'muted' : 'normal' };
@@ -85,21 +86,21 @@ function makeProvider(cap: WidgetCapabilities): LlmProvider {
       const m = s.models.find((x) => x.id === s.selectedModelId);
       return {
         id: s.selectedModelId,
-        contextWindow: m?.contextWindow ?? 200000,
+        contextWindow: m?.contextWindow ?? 1_000_000,
       };
     },
     async generateResponse(messages: ChatMessage[], _role: string) {
       const s = liveState.current;
       const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
-      if (!apiKey) throw new Error('OpenRouter API key not set');
+      if (!apiKey) throw new Error('Gemini API key not set');
       return chatCompletion(apiKey, s.selectedModelId, messages);
     },
   };
 }
 
 // ГОТОВНОСТЬ: ключ есть И модели успешно загружены (доказательство валидности
-// ключа) И выбранная модель присутствует в списке. Регистрируемся при готовности
-// НЕЗАВИСИМО от активности (расцепление: активность выбирает хедер ядра).
+// ключа) И выбранная модель в списке. Регистрируемся при готовности НЕЗАВИСИМО
+// от активности (активность выбирает хедер ядра).
 function isReady(state: State): boolean {
   return (
     state.hasApiKey &&
@@ -121,7 +122,7 @@ function syncProvider(state: State, cap: WidgetCapabilities): void {
 
 async function loadModels(
   cap: WidgetCapabilities,
-): Promise<{ models: OpenRouterModel[]; error: string | null }> {
+): Promise<{ models: GeminiModel[]; error: string | null }> {
   const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
   if (!apiKey) return { models: [], error: 'API key not set' };
   try {
@@ -132,7 +133,7 @@ async function loadModels(
   }
 }
 
-function filteredModels(state: State): OpenRouterModel[] {
+function filteredModels(state: State): GeminiModel[] {
   const q = state.modelFilter.trim().toLowerCase();
   if (!q) return state.models;
   return state.models.filter(
@@ -151,13 +152,13 @@ function configOverlay(state: State): ControlNode {
           text(
             state.hasApiKey
               ? 'Введите новый ключ, чтобы заменить текущий.'
-              : 'API-ключ OpenRouter',
+              : 'API-ключ Google AI Studio (Gemini)',
             true,
           ),
           {
             kind: 'iconButton',
             icon: '(?)',
-            title: 'Как получить API-ключ',
+            title: 'Как получить бесплатный ключ',
             onClick: { type: 'openHelp' },
           },
         ],
@@ -195,28 +196,28 @@ function configOverlay(state: State): ControlNode {
   };
 }
 
-// Пошаговая справка получения API-ключа OpenRouter — показывается в ЦЕНТРЕ
+// Пошаговая справка получения бесплатного ключа Gemini — показывается в ЦЕНТРЕ
 // (cap.ui.openHelp), не в тесном боксе плагина.
 const HELP_DOC = {
-  title: 'Как получить API-ключ OpenRouter',
+  title: 'Как получить бесплатный ключ Gemini',
   paragraphs: [
-    '1. Зарегистрируйтесь или войдите на openrouter.ai',
-    '2. Откройте раздел Keys (кнопка ниже)',
-    '3. Нажмите «Create Key» и задайте имя',
-    '4. Скопируйте ключ — он показывается только один раз',
-    '5. Вернитесь в AiZavr, вставьте ключ в поле и нажмите «Ок»',
-    '6. Пополните баланс в разделе Credits, иначе модели не будут отвечать',
+    '1. Откройте Google AI Studio (кнопка ниже) и войдите в свой Google-аккаунт',
+    '2. Нажмите «Create API key» (Создать ключ)',
+    '3. Скопируйте ключ',
+    '4. Вернитесь в AiZavr, вставьте ключ в поле и нажмите «Ок»',
+    '5. Платить ничего не нужно — у бесплатного тарифа есть дневной лимит запросов',
+    '6. Если ответ не приходит из-за лимита — подождите минуту и повторите',
   ],
-  link: { label: 'Открыть openrouter.ai/keys', href: KEYS_URL },
+  link: { label: 'Открыть aistudio.google.com/apikey', href: KEYS_URL },
 };
 
-export const openrouter: WidgetDef<State> = {
+export const gemini: WidgetDef<State> = {
   manifest: {
     id: PLUGIN_ID,
-    title: 'OpenRouter',
-    icon: 'bot',
-    defaultOpen: true,
-    order: 5,
+    title: 'Gemini (Google)',
+    icon: 'sparkles',
+    defaultOpen: false,
+    order: 6,
     surface: 'panel',
     supportedModels: '*',
     providesLlm: true, // радио активности в хедере панели (выбор обработчика диалога)
@@ -249,7 +250,7 @@ export const openrouter: WidgetDef<State> = {
 
     if (!state.hasApiKey) {
       workChildren.push(
-        text('Укажите API-ключ (⚙ вверху слева)', true),
+        text('Укажите бесплатный API-ключ (⚙ вверху слева)', true),
       );
     } else if (state.loadingModels) {
       workChildren.push(text('Загрузка моделей…', true));
@@ -352,7 +353,7 @@ export const openrouter: WidgetDef<State> = {
         let next: State = {
           ...state,
           hasApiKey,
-          configOpen: !hasApiKey,
+          configOpen: false,
           loadingModels: hasApiKey,
         };
 
@@ -369,7 +370,7 @@ export const openrouter: WidgetDef<State> = {
         }
 
         // Регистрируем ДО выбора активного: setActiveLlmProvider примет только
-        // готового (зарегистрированного). Авто-выбор, если активного ещё нет.
+        // готового. Авто-выбор, если активного ещё нет.
         syncProvider(next, cap);
         if (isReady(next) && !getActiveLlmProviderId()) {
           setActiveLlmProvider(PLUGIN_ID);

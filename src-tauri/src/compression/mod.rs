@@ -58,16 +58,16 @@ pub async fn attach_compressed(
         return Err("compression range is empty (start == end)".to_string());
     }
 
-    // Верхняя граница — всегда A-узел (маркер живёт только на assistant_message,
-    // D-058). Заодно даёт dialog_id для создаваемых узлов.
+    // Верхняя граница — A-узел с маркером: обычный assistant_message или
+    // синтетический корневой A0 (root_anchor, D-090). Заодно даёт dialog_id.
     let start = db::get_node(pool, start_node_id)
         .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "start node not found".to_string())?;
 
-    if start.node_type != "assistant_message" {
+    if start.node_type != "assistant_message" && start.node_type != "root_anchor" {
         return Err(format!(
-            "compression start must be assistant_message, got '{}'",
+            "compression start must be assistant_message/root_anchor, got '{}'",
             start.node_type
         ));
     }

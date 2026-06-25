@@ -3,11 +3,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { t, useLang, setLang, LANG_NAMES, type Lang } from "../i18n";
+import { t, useLang, setLang, availableLocales, type Lang } from "../i18n";
 
 type Theme = "light" | "dark";
-
-const LANGS: Lang[] = ["ru", "en"];
 
 function readTheme(): Theme {
   const v = document.documentElement.getAttribute("data-theme");
@@ -104,14 +102,14 @@ export function MenuBar(): React.ReactElement {
             </button>
             <div className="menu-dropdown-sep" />
             <div className="menu-dropdown-label">{t("menu.language")}</div>
-            {LANGS.map((code) => (
+            {availableLocales().map((loc) => (
               <button
-                key={code}
+                key={loc.code}
                 className="menu-dropdown-item"
-                onClick={() => selectLang(code)}
+                onClick={() => selectLang(loc.code)}
               >
-                <span className="menu-dropdown-check">{lang === code ? "✓" : ""}</span>
-                {LANG_NAMES[code]}
+                <span className="menu-dropdown-check">{lang === loc.code ? "✓" : ""}</span>
+                {loc.name}
               </button>
             ))}
           </div>

@@ -17,7 +17,10 @@ import type {
   ChatMessage,
   CompressionProvenance,
   HelpDoc,
+  PreviewDoc,
+  PreviewHandlers,
 } from './types';
+import { callCompression } from '../llm/compressionRegistry';
 
 // ---------------------------------------------------------------------------
 // Сырые формы из Rust (snake_case)
@@ -95,6 +98,8 @@ export interface CapabilityDeps {
   onTreeChanged: () => void;
   // плагин просит показать свою справку в центре (вместо диалога). Исполняет App.
   onOpenHelp: (doc: HelpDoc) => void;
+  onOpenPreview: (doc: PreviewDoc, handlers: PreviewHandlers) => void;
+  onClosePreview: () => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -169,10 +174,14 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
     // -- model.call: опосредованный вызов, КЛЮЧ В ЯДРЕ (D-073) ---------------
     //    Маршрутизация по роли — слой ролей v0.2. В MVP не заведено.
     model: {
-      async call(role: string, _messages: ChatMessage[]): Promise<string> {
+      async call(role: string, messages: ChatMessage[]): Promise<string> {
+        if (role === 'compression' || role.startsWith('compression_')) {
+          const resp = await callCompression(messages);
+          return resp.content;
+        }
         return notWired(
           `model.call(role="${role}")`,
-          'опосредованный вызов модели по роли появится со слоем ролей (v0.2)',
+          'роль не поддерживается; для диалога используется активный LLM-плагин',
         );
       },
     },
@@ -197,6 +206,31 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
       },
       openHelp(doc): void {
         deps.onOpenHelp(doc);
+      },
+      openPreview(doc, handlers): void {
+        deps.onOpenPreview(doc, handlers);
+      },
+      closePreview(): void {
+        deps.onClosePreview();
+      },
+    },
+    tags: {
+      async getForActiveDialog(): Promise<string[]> {
+        const dialogId = deps.getActiveDialogId();
+        if (!dialogId) return [];
+        return invoke<string[]>('cmd_get_dialog_tags', { dialogId });
+      },
+      async setForActiveDialog(tags: string[]): Promise<string[]> {
+        const dialogId = deps.getActiveDialogId();
+        if (!dialogId) {
+          throw new Error('Нет активного диалога');
+        }
+        const updated = await invoke<string[]>('cmd_set_dialog_tags', {
+          dialogId,
+          tags,
+        });
+        deps.onTreeChanged();
+        return updated;
       },
     },
   };

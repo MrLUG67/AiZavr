@@ -192,6 +192,7 @@ export function NotebooksPanel({
       invoke<Dialog>("cmd_create_dialog_in_notebook", {
         notebookId,
         title: t("notebooks.newDialogTitle"),
+        rootMarkerComment: t("app.marker.rootDefault"),
       }),
     );
     if (d) {
@@ -343,10 +344,12 @@ export function NotebooksPanel({
             if (isSystem) return;
             dragRef.current = { kind: "notebook", id: nb.id };
             e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", nb.id);
           }}
           onDragOver={(e) => {
             if (isTrash) return; // в корзину тащить нельзя — там удаление через меню
             e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
             setDropTarget(nb.id);
           }}
           onDragLeave={() => setDropTarget((t) => (t === nb.id ? null : t))}
@@ -466,6 +469,7 @@ export function NotebooksPanel({
                     // в обычный блокнот (фактическое восстановление).
                     dragRef.current = { kind: "dialog", id: d.id };
                     e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", d.id);
                   }}
                   onClick={() => { if (!editing) onOpenDialog(d.id); }}
                   onKeyDown={(e) => {

@@ -23,11 +23,18 @@ async fn cmd_create_dialog(
     state: tauri::State<'_, AppState>,
     title: String,
     notebook_id: Option<String>,
+    root_marker_comment: String,
 ) -> Result<DbDialog, String> {
     let id = uuid::Uuid::new_v4().to_string();
     db::create_dialog(&state.db, &id, &title, notebook_id.as_deref())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    // Засев синтетического корневого анкора Q0->A0 + маркер #0 (D-090).
+    tree::seed_root_anchor(&state.db, &id, &root_marker_comment).await?;
+    db::get_dialog(&state.db, &id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "dialog not found after create".to_string())
 }
 
 #[tauri::command]
@@ -69,6 +76,25 @@ async fn cmd_update_dialog_leaf(
     db::update_dialog_leaf(&state.db, &dialog_id, &leaf_id)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_get_dialog_tags(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Vec<String>, String> {
+    db::get_dialog_tags(&state.db, &dialog_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_set_dialog_tags(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    tags: Vec<String>,
+) -> Result<Vec<String>, String> {
+    db::set_dialog_tags(&state.db, &dialog_id, &tags).await
 }
 
 // ---------------------------------------------------------------------------
@@ -463,8 +489,15 @@ async fn cmd_create_dialog_in_notebook(
     state: tauri::State<'_, AppState>,
     notebook_id: String,
     title: String,
+    root_marker_comment: String,
 ) -> Result<DbDialog, String> {
-    notebooks::create_dialog_in_notebook(&state.db, &notebook_id, &title).await
+    let dialog = notebooks::create_dialog_in_notebook(&state.db, &notebook_id, &title).await?;
+    // Засев синтетического корневого анкора Q0->A0 + маркер #0 (D-090).
+    tree::seed_root_anchor(&state.db, &dialog.id, &root_marker_comment).await?;
+    db::get_dialog(&state.db, &dialog.id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "dialog not found after create".to_string())
 }
 
 /// Переподчинить беседу в другой блокнот.
@@ -536,6 +569,8 @@ pub fn run() {
             cmd_list_dialogs,
             cmd_update_dialog_title,
             cmd_update_dialog_leaf,
+            cmd_get_dialog_tags,
+            cmd_set_dialog_tags,
             cmd_create_node,
             cmd_get_node,
             cmd_get_branch,

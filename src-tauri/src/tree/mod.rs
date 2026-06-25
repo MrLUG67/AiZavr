@@ -1,6 +1,7 @@
 // src-tauri/src/tree/mod.rs
 
 use crate::db;
+use crate::markers;
 use sqlx::SqlitePool;
 
 /// Результат операции ветвления — возвращается в UI.
@@ -8,6 +9,48 @@ use sqlx::SqlitePool;
 pub struct BranchResult {
     pub new_node_id: String,
     pub dialog_id: String,
+}
+
+/// Засеять синтетический корневой анкор беседы (D-090).
+///
+/// Каждая беседа начинается со СКРЫТОЙ пары Q0->A0 (node_type='root_anchor'),
+/// после чего реальный первый вопрос становится ребёнком A0. Так корень ведёт
+/// себя как обычный узел после ответа A: маркер, '+', развилка работают на A0
+/// переиспользованием общей механики, без особого случая 'сёстры без родителя'.
+///
+/// Анкоры пустые (content='') и не идут ни в ленту, ни в LLM — отсекаются по
+/// node_type. На A0 сразу ставится корневой маркер #0 (зарезервирован; маркеры
+/// пользователя начинаются с #1) с дефолтным комментарием (из i18n, правится).
+///
+/// Вызывается ОДИН раз сразу после db::create_dialog. Курсор диалога после
+/// засева стоит на A0 — первый вопрос прицепится к нему.
+pub async fn seed_root_anchor(
+    pool: &SqlitePool,
+    dialog_id: &str,
+    root_marker_comment: &str,
+) -> Result<(), String> {
+    // Q0 — корневой анкор. parent=None => становится root_node_id диалога.
+    let q0 = uuid::Uuid::new_v4().to_string();
+    db::create_node(pool, &q0, dialog_id, None, "root_anchor", "", None, None, 0)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // A0 — анкор-ответ под Q0. create_node проставит active_child у Q0 и сдвинет
+    // курсор диалога на A0.
+    let a0 = uuid::Uuid::new_v4().to_string();
+    db::create_node(pool, &a0, dialog_id, Some(&q0), "root_anchor", "", None, None, 0)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Корневой маркер #0 на A0 (D-090). Пустой комментарий не пишем.
+    let comment = if root_marker_comment.trim().is_empty() {
+        None
+    } else {
+        Some(root_marker_comment)
+    };
+    markers::create_marker(pool, &a0, "#0", comment).await?;
+
+    Ok(())
 }
 
 /// Создать новую ветку от указанного родительского узла.

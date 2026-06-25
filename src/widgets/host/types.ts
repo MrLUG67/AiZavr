@@ -19,7 +19,9 @@ export type CapabilityName =
   | 'compression.attach'
   | 'model.call'
   | 'secrets'
-  | 'ui.focus';
+  | 'ui.focus'
+  | 'tags.read'
+  | 'tags.write';
 
 export interface WidgetManifest {
   // идентичность
@@ -43,6 +45,11 @@ export interface WidgetManifest {
   // плагин под модель') ОТЛИЧНА от ДОВЕРИЯ ('безопасен ли' — даётся узостью
   // WidgetContext, D-072, а не манифестом).
   supportedModels?: string[] | '*';
+
+  // Плагин-источник LLM (выбор модели для обработки диалога). Хедер панели
+  // показывает для таких виджетов радио «активен/нет»; выбрать можно только
+  // ГОТОВЫЙ (с валидным ключом). Обычные виджеты этого не имеют.
+  providesLlm?: boolean;
 
   // РАСКРЫТИЕ, не принуждение (D-073). В MVP не проверяется. Поля есть, чтобы
   // позже завести курирование/provenance без смены формата.
@@ -106,6 +113,7 @@ export interface NodeView {
   nodeType:
     | 'user_message'
     | 'assistant_message'
+    | 'root_anchor'
     | 'artifact'
     | 'compressed_summary'
     | 'compression_placeholder'
@@ -124,6 +132,7 @@ export interface WidgetFacts {
   model: ModelFacts;                      // активная модель (D-081); всегда есть —
                                           // без выбранной модели чат невозможен
   activeLlmProviderId: string | null;     // какой LLM-плагин обрабатывает диалог
+  dialogTags: string[];                   // теги активного диалога (без '#')
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +206,13 @@ export interface WidgetCapabilities {
     // показать справку плагина в ЦЕНТРАЛЬНОЙ области (вместо текущего диалога),
     // с кнопкой закрытия. Рендерит App; в тесном боксе плагина место не на это.
     openHelp(doc: HelpDoc): void;
+    openPreview(doc: PreviewDoc, handlers: PreviewHandlers): void;
+    closePreview(): void;
+  };
+  // теги диалога: чтение/запись для автоматизации плагинами.
+  tags: {
+    getForActiveDialog(): Promise<string[]>;
+    setForActiveDialog(tags: string[]): Promise<string[]>;
   };
 }
 
@@ -206,6 +222,21 @@ export interface HelpDoc {
   title: string;
   paragraphs: string[];
   link?: { label: string; href: string };
+}
+
+/** Превью в центре (тот же хром, что help-doc): один блок текста + действия. */
+export interface PreviewDoc {
+  title: string;
+  text: string;
+}
+
+export interface PreviewHandlers {
+  onConfirm: () => void | Promise<void>;
+  onCancel: () => void;
+  /** После onConfirm/onCancel — сообщение виджету-источнику (TEA). */
+  widgetId?: string;
+  confirmMsg?: WidgetMsg;
+  cancelMsg?: WidgetMsg;
 }
 
 // ---------------------------------------------------------------------------

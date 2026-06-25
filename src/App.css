@@ -69,6 +69,20 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  min-height: 49px;
+  padding-right: 12px;
+}
+.dialog-head .dialog-title,
+.dialog-head .dialog-title-edit {
+  border-bottom: none;
+  margin: 0;
+  flex: 1;
+}
 .dialog-title--empty { color: #999; font-style: italic; cursor: default; }
 
 .dialog-title-edit {
@@ -84,6 +98,42 @@ h1 {
   background: rgba(56,121,217,0.06);
   color: #0f0f0f;
   outline: none;
+}
+
+.dialog-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 52%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+.dialog-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(57,108,216,0.14);
+  color: #315cae;
+}
+.dialog-tags-empty {
+  font-size: 12px;
+  color: #8a8a8a;
+  font-style: italic;
+}
+.dialog-tags-edit {
+  min-width: 260px;
+  max-width: 52%;
+  padding: 6px 10px;
+  font-size: 0.9em;
+  border: 1px solid rgba(56,121,217,0.6);
+  border-radius: 8px;
+  background: rgba(56,121,217,0.06);
+  box-shadow: none;
 }
 
 /* ---------------------------------------------------------------------------
@@ -667,6 +717,126 @@ h1 {
   white-space: pre-wrap;
 }
 
+/* Текстовый сегмент рендерера ответа: ведёт себя как прежний <p> (pre-wrap),
+   но соседствует с код-фреймами, поэтому даём вертикальный отступ между
+   сегментами. */
+.message-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.message-text + .code-block,
+.code-block + .message-text,
+.code-block + .code-block,
+.message-text + .md-h,
+.md-h + .message-text,
+.message-text + .md-list,
+.md-list + .message-text,
+.code-block + .md-h,
+.md-h + .code-block,
+.md-list + .code-block,
+.code-block + .md-list {
+  margin-top: 8px;
+}
+
+/* Заголовки markdown в ответе (#/##/###…). Сдержанные размеры — это подзаголовки
+   ВНУТРИ пузыря, а не заголовки страницы. */
+.md-h {
+  margin: 12px 0 4px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+.md-h:first-child {
+  margin-top: 0;
+}
+.md-h1 { font-size: 1.25rem; }
+.md-h2 { font-size: 1.15rem; }
+.md-h3 { font-size: 1.05rem; }
+.md-h4, .md-h5, .md-h6 {
+  font-size: 1rem;
+  opacity: 0.9;
+}
+
+/* Списки markdown (-, *, 1.) в ответе. */
+.md-list {
+  margin: 4px 0;
+  padding-left: 1.4em;
+}
+.md-list li {
+  margin: 2px 0;
+}
+
+/* Инлайн-код (`…`) внутри текста ответа: лёгкая подложка + моноширинный шрифт. */
+.inline-code {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", "Menlo", monospace;
+  font-size: 0.88em;
+  background-color: rgba(57, 108, 216, 0.12);
+  border: 1px solid rgba(57, 108, 216, 0.18);
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Фрейм блока кода. Цвет рамки/подложки берём из палитры диалога (акцент #396cd8),
+   чтобы код визуально принадлежал беседе, а не выпадал из неё. Подсветки
+   синтаксиса нет — это базовый слой (оставлено на будущее за спец-плагинами). */
+.code-block {
+  border: 1px solid rgba(57, 108, 216, 0.28);
+  border-radius: 8px;
+  background-color: rgba(57, 108, 216, 0.06);
+  overflow: hidden;
+}
+
+/* Ярлык языка ПЕРЕД блоком (если язык указан в заборе ```lang). */
+.code-block__lang {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", "Menlo", monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  color: #2b528f;
+  background-color: rgba(57, 108, 216, 0.14);
+  border-bottom: 1px solid rgba(57, 108, 216, 0.22);
+  padding: 3px 10px;
+}
+
+.code-block__pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", "Menlo", monospace;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 4;
+}
+.code-block__pre code {
+  font-family: inherit;
+}
+
+/* Кнопка «копировать» ПОСЛЕ блока кода (обязательна). */
+.code-block__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  border-top: 1px solid rgba(57, 108, 216, 0.18);
+}
+.code-copy-btn {
+  font-size: 0.74rem;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(57, 108, 216, 0.28);
+  background-color: rgba(255, 255, 255, 0.6);
+  color: #2b528f;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.code-copy-btn:hover {
+  background-color: rgba(57, 108, 216, 0.14);
+  border-color: rgba(57, 108, 216, 0.45);
+}
+
 /* Узел-резюме сжатия (S, D-060): нейтральная плашка ПО ЦЕНТРУ, не пузырь
    ассистента — S в Q-слоте, это третий вид узла, чтобы глаз не читал «A после A». */
 .message--compressed {
@@ -743,6 +913,73 @@ h1 {
   transition: opacity 0.2s;
 }
 .fork-btn:hover { opacity: 1; background: #e67e2215; border-color: #e67e22; }
+
+/* Пиктограмма копирования под пузырём (вариант 2). Неброская: проявляется при
+   наведении на сообщение и наливается на наведении на саму кнопку. В строке
+   действий ассистента прижата вправо (margin-left:auto); у пользовательских
+   сообщений и S-узла стоит в подвале .message-foot. */
+.message-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.message-copy-btn {
+  margin-left: auto;
+  padding: 1px 7px;
+  font-size: 0.95em;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  cursor: pointer;
+  opacity: 0.3;
+  transition: opacity 0.15s, background-color 0.15s, border-color 0.15s;
+}
+.message:hover .message-copy-btn { opacity: 0.6; }
+.message-copy-btn:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.12);
+}
+
+/* Контекстное меню копирования (вариант 1): плавающее у курсора. */
+.msg-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.msg-context-menu-item {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.9em;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: inherit;
+}
+.msg-context-menu-item:hover {
+  background: rgba(57,108,216,0.12);
+  border-color: transparent;
+}
+.msg-context-menu-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.msg-context-menu-item:disabled:hover {
+  background: transparent;
+}
 
 /* ---------------------------------------------------------------------------
    Composer (нижнее поле ввода)
@@ -877,6 +1114,29 @@ h1 {
   border: 1px solid #396cd8; background: #396cd8; color: #fff; cursor: pointer;
 }
 .help-doc-link:hover { background: #2f5bb8; }
+
+/* Превью уплотнения — тот же хром, что help-doc (D-008). */
+.preview-doc-body { max-width: none; flex: 1; min-height: 0; }
+.preview-doc-text {
+  margin: 0; padding: 12px 14px; border-radius: 8px;
+  background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.1);
+  font-family: inherit; font-size: 14px; line-height: 1.55; white-space: pre-wrap;
+  word-break: break-word; overflow-y: auto; max-height: min(60vh, 480px);
+}
+.preview-doc-actions {
+  display: flex; gap: 10px; margin-top: 16px; padding-top: 12px;
+  border-top: 1px solid rgba(0,0,0,0.15);
+}
+.preview-doc-btn {
+  font-size: 14px; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.15); background: rgba(0,0,0,0.04);
+}
+.preview-doc-btn:hover:not(:disabled) { background: rgba(0,0,0,0.09); }
+.preview-doc-btn:disabled { opacity: 0.55; cursor: default; }
+.preview-doc-btn-primary {
+  border-color: #396cd8; background: #396cd8; color: #fff;
+}
+.preview-doc-btn-primary:hover:not(:disabled) { background: #2f5bb8; }
 
 /* Ошибка отправки в LLM — видимая причина, не только консоль. */
 .send-error {
@@ -1032,6 +1292,17 @@ h1 {
   h1 { border-bottom-color: rgba(255,255,255,0.1); }
   .dialog-title--empty { color: #888; }
   .dialog-title-edit { background: rgba(97,160,255,0.12); color: #f0f0f0; border-bottom-color: rgba(97,160,255,0.7); }
+  .dialog-head { border-bottom-color: rgba(255,255,255,0.1); }
+  .dialog-tag-chip {
+    background: rgba(97,160,255,0.22);
+    color: #9ec3ff;
+  }
+  .dialog-tags-empty { color: #9a9a9a; }
+  .dialog-tags-edit {
+    border-color: rgba(97,160,255,0.6);
+    background: rgba(97,160,255,0.12);
+    color: #f0f0f0;
+  }
 
   .message.assistant .message-content {
     background-color: rgba(255,255,255,0.08);
@@ -1040,6 +1311,32 @@ h1 {
   .message-content--compressed {
     background-color: rgba(255,255,255,0.05);
     border-color: rgba(255,255,255,0.25);
+  }
+
+  /* Копирование: глобальное правило button в тёмной теме (0,1,1) перебивает
+     базовый класс (0,1,0), поэтому фон/цвет задаём явно классом. */
+  .message-copy-btn {
+    background: transparent;
+    color: #f6f6f6;
+  }
+  .message-copy-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.18);
+  }
+  .msg-context-menu {
+    background: #1f1f1f;
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+  }
+  .msg-context-menu-item {
+    background: transparent;
+    color: #e6e6e6;
+  }
+  .msg-context-menu-item:hover {
+    background: rgba(97,160,255,0.2);
+  }
+  .msg-context-menu-item:disabled:hover {
+    background: transparent;
   }
 
   .composer {
@@ -1124,6 +1421,12 @@ h1 {
   .help-doc-close:hover { background: rgba(255,255,255,0.16); }
   .help-doc-link { background: #61a0ff; border-color: #61a0ff; color: #111; }
   .help-doc-link:hover { background: #4d8de6; }
+  .preview-doc-text { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #dde; }
+  .preview-doc-actions { border-top-color: rgba(255,255,255,0.18); }
+  .preview-doc-btn { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #ddd; }
+  .preview-doc-btn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+  .preview-doc-btn-primary { background: #61a0ff; border-color: #61a0ff; color: #111; }
+  .preview-doc-btn-primary:hover:not(:disabled) { background: #4d8de6; }
   .send-error { background: rgba(255, 99, 99, 0.12); border-color: rgba(255, 99, 99, 0.3); }
   .send-error-text, .send-error-close, .unanswered-error { color: #ff8a8a; }
 
@@ -1309,10 +1612,19 @@ h1 {
   border-top: 1px solid rgba(0,0,0,0.1);
   padding-top: 12px;
 }
+/* Строка заголовка: радио активности (для LLM) + кнопка свёртки. Радио вне
+   кнопки — нельзя button в button; клик по радио не сворачивает секцию. */
+.widget-section-head {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+}
+.widget-section.is-collapsed .widget-section-head { margin-bottom: 0; }
+.widget-section-radio { flex-shrink: 0; margin: 0; cursor: pointer; }
+.widget-section-radio:disabled { cursor: not-allowed; }
+
 /* Заголовок секции = кнопка свёртки (D-070): треугольник + имя плагина. */
 .widget-section-title {
   display: flex; align-items: center; gap: 6px;
-  width: 100%; margin: 0 0 6px; padding: 2px 0;
+  flex: 1; margin: 0; padding: 2px 0;
   background: none; border: none; box-shadow: none;
   font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
   color: #888; cursor: pointer; text-align: left;
@@ -1321,8 +1633,14 @@ h1 {
 .widget-section-caret { font-size: 8px; line-height: 1; color: #aaa; width: 10px; }
 .widget-section-title:hover .widget-section-caret { color: #777; }
 .widget-section-name { flex: 1; }
-/* свёрнутая секция: только заголовок, без нижнего отступа под контент. */
-.widget-section.is-collapsed .widget-section-title { margin-bottom: 0; }
+
+/* Активный LLM-провайдер: имя темнее и жирнее (видно, кто обрабатывает ответы). */
+.widget-section-head.is-active .widget-section-name {
+  color: #1a1a1a; font-weight: 700;
+}
+/* Не готов (нет валидного ключа): приглушён — выбрать нельзя. */
+.widget-section-head.is-not-ready .widget-section-name { color: #bbb; }
+.widget-section-head.is-not-ready .widget-section-caret { color: #ccc; }
 
 /* свёрнутый рельс */
 .widget-rail {
@@ -1475,6 +1793,9 @@ h1 {
   .widget-section-title:hover { color: #ccc; }
   .widget-section-caret { color: #777; }
   .widget-section-title:hover .widget-section-caret { color: #aaa; }
+  .widget-section-head.is-active .widget-section-name { color: #fff; font-weight: 700; }
+  .widget-section-head.is-not-ready .widget-section-name { color: #666; }
+  .widget-section-head.is-not-ready .widget-section-caret { color: #555; }
 
   .widget-text { color: #ddd; }
   .widget-text.is-muted { color: #888; }
@@ -1525,4 +1846,34 @@ h1 {
     --meter-high: #e07b39;
     --meter-crit: #f85149;
   }
+}
+
+/* Хедер действий корня беседы (D-090): тонкая строка над лентой с маркером #0,
+   «+» и развилкой ⑂. Не пузырь — служебный анкор A0 в ленту не идёт. */
+.root-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.12);
+}
+.root-actions .message-actions {
+  margin-top: 0;
+}
+.root-actions-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #aaa;
+  user-select: none;
+}
+/* Корневой маркер #0 — это span-метка, не кнопка: неудаляем, правка двойным
+   кликом (как обычный комментарий маркера). */
+.marker-btn--root {
+  cursor: default;
+}
+@media (prefers-color-scheme: dark) {
+  .root-actions { border-bottom-color: rgba(255, 255, 255, 0.12); }
+  .root-actions-label { color: #777; }
 }
