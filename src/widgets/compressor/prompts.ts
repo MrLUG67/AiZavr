@@ -1,13 +1,14 @@
-// Инструкция (system) для LLM-уплотнения. Жёсткость регулируется в UI виджета.
-export const DEFAULT_COMPRESSION_SYSTEM_PROMPT = `Сделай короткий пересказ диалога. Отрази принципиально важные моменты, факты, выводы. Убери все промежуточные рассуждения, преамбулы, связки и т.д. Вопросы пользователя не цитируй, но используй как основу канвы рассуждений. Объём выходного текста должен быть 25–30% от объёма исходного.
+import { ct } from './i18n';
 
-Сохрани дословно: блоки кода, числа, версии, идентификаторы.
-Верни ТОЛЬКО текст пересказа, без преамбулы и пояснений.`;
+/** Дефолтная инструкция для LLM — зависит от языка UI. */
+export function defaultCompressionPrompt(): string {
+  return ct('prompt.default');
+}
 
-/** Пустая или пробельная строка → дефолт. */
+/** Пустая или пробельная строка → дефолт текущего языка. */
 export function resolveSystemPrompt(raw: string): string {
-  const t = raw.trim();
-  return t || DEFAULT_COMPRESSION_SYSTEM_PROMPT;
+  const trimmed = raw.trim();
+  return trimmed || defaultCompressionPrompt();
 }
 
 export function buildCompressionMessages(
@@ -18,9 +19,7 @@ export function buildCompressionMessages(
     { role: 'system', content: resolveSystemPrompt(systemPrompt) },
     {
       role: 'user',
-      content:
-        `Ниже фрагмент беседы для сжатия (${transcript.length} симв.).\n\n` +
-        transcript,
+      content: ct('prompt.userPrefix', { count: transcript.length }) + transcript,
     },
   ];
 }

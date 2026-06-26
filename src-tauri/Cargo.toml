@@ -16,6 +16,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+open = "5"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
@@ -33,4 +35,6 @@ keyring = { version = "3", features = ["windows-native"] }
 # UUID generation for tree nodes
 uuid = { version = "1", features = ["v4", "serde"] }
 
+# Base64 decode for LLM image attachments
+base64 = "0.22"
 

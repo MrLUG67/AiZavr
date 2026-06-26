@@ -6,12 +6,14 @@ mod keychain;
 mod markers;
 mod compression;
 mod notebooks;
+mod artifacts;
 
 use db::{DbDialog, DbNode};
 use notebooks::DbNotebook;
 
 struct AppState {
     db: sqlx::SqlitePool,
+    data_dir: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +84,7 @@ async fn cmd_update_dialog_leaf(
 async fn cmd_get_dialog_tags(
     state: tauri::State<'_, AppState>,
     dialog_id: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<db::Tag>, String> {
     db::get_dialog_tags(&state.db, &dialog_id)
         .await
         .map_err(|e| e.to_string())
@@ -93,8 +95,78 @@ async fn cmd_set_dialog_tags(
     state: tauri::State<'_, AppState>,
     dialog_id: String,
     tags: Vec<String>,
-) -> Result<Vec<String>, String> {
-    db::set_dialog_tags(&state.db, &dialog_id, &tags).await
+    source: Option<String>,
+) -> Result<Vec<db::Tag>, String> {
+    db::set_dialog_tags(
+        &state.db,
+        &dialog_id,
+        &tags,
+        source.as_deref().unwrap_or("manual"),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cmd_list_tags(state: tauri::State<'_, AppState>) -> Result<Vec<db::Tag>, String> {
+    db::list_tags(&state.db).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_suggest_tags(
+    state: tauri::State<'_, AppState>,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<db::Tag>, String> {
+    db::suggest_tags(&state.db, &query, limit.unwrap_or(8))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_get_or_create_tag(
+    state: tauri::State<'_, AppState>,
+    display: String,
+    source: Option<String>,
+) -> Result<db::Tag, String> {
+    db::get_or_create_tag(&state.db, &display, source.as_deref().unwrap_or("manual")).await
+}
+
+#[tauri::command]
+async fn cmd_add_dialog_tag(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    tag_id: String,
+) -> Result<(), String> {
+    db::add_dialog_tag(&state.db, &dialog_id, &tag_id).await
+}
+
+#[tauri::command]
+async fn cmd_remove_dialog_tag(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    tag_id: String,
+) -> Result<(), String> {
+    db::remove_dialog_tag(&state.db, &dialog_id, &tag_id).await
+}
+
+#[tauri::command]
+async fn cmd_search_dialog_tags(
+    state: tauri::State<'_, AppState>,
+    query: String,
+) -> Result<Vec<db::TagHit>, String> {
+    db::search_dialog_tags(&state.db, &query)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn cmd_list_dialogs_by_tag(
+    state: tauri::State<'_, AppState>,
+    tag_id: String,
+) -> Result<Vec<db::DbDialog>, String> {
+    db::list_dialogs_by_tag(&state.db, &tag_id)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -279,15 +351,34 @@ async fn cmd_resolve_answer(
     content: String,
     model_id: Option<String>,
     model_role: Option<String>,
+    plugin_id: Option<String>,
     tokens_count: i64,
+    media: Option<Vec<artifacts::MediaInput>>,
 ) -> Result<DbNode, String> {
+    let extra = match media.as_ref().filter(|m| !m.is_empty()) {
+        Some(items) => {
+            // Устойчиво: даже если ни одна картинка не сохранилась, ответ
+            // (текст) всё равно фиксируется — не теряем реплику модели.
+            let attachments =
+                artifacts::persist_llm_media(&state.data_dir, &placeholder_id, items);
+            if attachments.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({ "attachments": attachments }).to_string())
+            }
+        }
+        None => None,
+    };
+
     db::resolve_answer(
         &state.db,
         &placeholder_id,
         &content,
         model_id.as_deref(),
         model_role.as_deref(),
+        plugin_id.as_deref(),
         tokens_count,
+        extra.as_deref(),
     )
     .await
     .map_err(|e| e.to_string())
@@ -520,6 +611,42 @@ async fn cmd_delete_dialog(
 }
 
 // ---------------------------------------------------------------------------
+// Артефакты (D-091/D-092)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn cmd_attach_artifact(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+    source_path: String,
+) -> Result<DbNode, String> {
+    artifacts::attach_from_path(&state.db, &state.data_dir, &dialog_id, &source_path).await
+}
+
+#[tauri::command]
+async fn cmd_open_artifact(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<(), String> {
+    artifacts::open_with_os(&state.db, &state.data_dir, &node_id).await
+}
+
+#[tauri::command]
+async fn cmd_open_message_attachment(
+    state: tauri::State<'_, AppState>,
+    message_node_id: String,
+    index: usize,
+) -> Result<(), String> {
+    artifacts::open_message_attachment(
+        &state.db,
+        &state.data_dir,
+        &message_node_id,
+        index,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
 // Keychain
 // ---------------------------------------------------------------------------
 
@@ -546,6 +673,7 @@ fn cmd_delete_api_key(provider_id: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -560,7 +688,10 @@ pub fn run() {
                     .expect("failed to initialize database")
             });
 
-            app.manage(AppState { db: pool });
+            app.manage(AppState {
+                db: pool,
+                data_dir: app_data_dir,
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -571,6 +702,13 @@ pub fn run() {
             cmd_update_dialog_leaf,
             cmd_get_dialog_tags,
             cmd_set_dialog_tags,
+            cmd_list_tags,
+            cmd_suggest_tags,
+            cmd_get_or_create_tag,
+            cmd_add_dialog_tag,
+            cmd_remove_dialog_tag,
+            cmd_search_dialog_tags,
+            cmd_list_dialogs_by_tag,
             cmd_create_node,
             cmd_get_node,
             cmd_get_branch,
@@ -597,6 +735,9 @@ pub fn run() {
             cmd_resolve_linear_range,
             cmd_attach_compressed,
             cmd_get_compression_meta,
+            cmd_attach_artifact,
+            cmd_open_artifact,
+            cmd_open_message_attachment,
             cmd_list_notebooks,
             cmd_create_notebook,
             cmd_rename_notebook,

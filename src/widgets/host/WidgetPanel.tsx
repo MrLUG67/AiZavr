@@ -14,6 +14,7 @@ import { listWidgets } from './registry';
 import { WidgetHost } from './WidgetHost';
 import { makeCapabilities, type CapabilityDeps } from './capabilities';
 import type { WidgetFacts } from './types';
+import { t } from '../../i18n';
 
 const LS_OPEN = 'aizavr.panel.open';
 const LS_PINNED = 'aizavr.panel.pinned';
@@ -25,6 +26,12 @@ const LS_COLLAPSED = (id: string) => `aizavr.widget.collapsed.${id}`;
 const WIDTH_MIN = 240;
 const WIDTH_MAX = 560;
 const WIDTH_DEFAULT = 320;
+
+function widgetTitle(id: string, fallback: string): string {
+  const key = `widgets.${id}.title`;
+  const tr = t(key);
+  return tr === key ? fallback : tr;
+}
 
 function readBool(key: string, fallback: boolean): boolean {
   try {
@@ -108,7 +115,7 @@ export function WidgetPanel(props: {
         {/* иконки виджетов как подсказка, что внутри (как activity bar) */}
         <div className="widget-rail-icons">
           {widgets.map((w) => (
-            <span key={w.manifest.id} className="widget-rail-icon" title={w.manifest.title}>
+            <span key={w.manifest.id} className="widget-rail-icon" title={widgetTitle(w.manifest.id, w.manifest.title)}>
               {/* иконка — имя lucide-строкой; пока текстовый плейсхолдер */}
               {w.manifest.title.slice(0, 1)}
             </span>
@@ -211,7 +218,7 @@ export function WidgetPanel(props: {
                   <span className="widget-section-caret">
                     {isCollapsed ? '▼' : '▲'}
                   </span>
-                  <span className="widget-section-name">{def.manifest.title}</span>
+                  <span className="widget-section-name">{widgetTitle(id, def.manifest.title)}</span>
                 </button>
               </div>
               {!isCollapsed && (

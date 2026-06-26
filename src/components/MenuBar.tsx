@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { t, useLang, setLang, availableLocales, type Lang } from "../i18n";
+import { useMetricsEnabled, toggleMetricsEnabled } from "../settings/metricsSetting";
 
 type Theme = "light" | "dark";
 
@@ -22,6 +23,7 @@ export function MenuBar(): React.ReactElement {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>(() => readTheme());
   const lang = useLang();
+  const metricsEnabled = useMetricsEnabled();
   const barRef = useRef<HTMLDivElement>(null);
 
   function selectTheme(next: Theme) {
@@ -99,6 +101,11 @@ export function MenuBar(): React.ReactElement {
             <button className="menu-dropdown-item" onClick={() => selectTheme("light")}>
               <span className="menu-dropdown-check">{theme === "light" ? "✓" : ""}</span>
               {t("menu.lightTheme")}
+            </button>
+            <div className="menu-dropdown-sep" />
+            <button className="menu-dropdown-item" onClick={() => toggleMetricsEnabled()}>
+              <span className="menu-dropdown-check">{metricsEnabled ? "✓" : ""}</span>
+              {t("menu.requestMetrics")}
             </button>
             <div className="menu-dropdown-sep" />
             <div className="menu-dropdown-label">{t("menu.language")}</div>

@@ -92,7 +92,12 @@ function makeProvider(cap: WidgetCapabilities): LlmProvider {
       const s = liveState.current;
       const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
       if (!apiKey) throw new Error('OpenRouter API key not set');
-      return chatCompletion(apiKey, s.selectedModelId, messages);
+      const m = s.models.find((x) => x.id === s.selectedModelId);
+      return chatCompletion(apiKey, s.selectedModelId, messages, m);
+    },
+    getModelName(modelId: string) {
+      const m = liveState.current.models.find((x) => x.id === modelId);
+      return m?.name ?? null;
     },
   };
 }

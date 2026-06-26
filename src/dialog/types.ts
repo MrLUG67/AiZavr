@@ -3,6 +3,8 @@
 // контроллер<->презентация): и контроллер (useDialogController), и будущий
 // презентационный слой (DialogView) импортируют формы отсюда, а не из App.
 
+import type { ArtifactData } from "./artifactMedia";
+
 export interface LlmMessage {
   role: "user" | "assistant";
   content: string;
@@ -12,11 +14,21 @@ export interface Message {
   role: "user" | "assistant";
   content: string;
   nodeId: string;
-  nodeType: string;             // user_message | assistant_message | unanswered_placeholder
-  childrenCount: number;         // total, включая удалённые
-  deletedChildrenCount: number;  // только удалённые (D-050)
-  markers: MarkerData[];         // маркеры на этом узле (D-058)
+  nodeType: string;
+  childrenCount: number;
+  deletedChildrenCount: number;
+  markers: MarkerData[];
+  artifact: ArtifactData | null;
+  /** Картинки/файлы внутри ответа ассистента (extra.attachments). */
+  attachments: ArtifactData[];
+  /** Модель, сгенерировавшая узел (для метрики запросов). null у Q/заглушек. */
+  modelId: string | null;
+  /** LLM-плагин, сгенерировавший узел. null у старых узлов/Q/заглушек. */
+  pluginId: string | null;
 }
+
+export type { ArtifactData } from "./artifactMedia";
+export type { MediaKind } from "./artifactMedia";
 
 export interface MarkerData {
   id: string;
@@ -43,6 +55,21 @@ export interface DbDialog {
   active_leaf_id: string | null;
 }
 
+// Тег из справочника (миграция 009). name — нормализованный ключ, display_name —
+// исходный регистр для показа.
+export interface Tag {
+  id: string;
+  name: string;
+  display_name: string;
+  source: string;
+  created_at: string;
+}
+
+// Тег + число помеченных им бесед (выдача поиска по тегам).
+export interface TagHit extends Tag {
+  dialog_count: number;
+}
+
 export interface DbNode {
   id: string;
   parent_id: string | null;
@@ -50,10 +77,13 @@ export interface DbNode {
   node_type: string;
   content: string;
   active_child_id: string | null;
+  model_id: string | null;
+  plugin_id: string | null;
   children_count: number;
   branch_name: string | null;
   last_visited_leaf_id: string | null;
   is_deleted: boolean;
+  extra: string | null;
 }
 
 export interface Notebook {

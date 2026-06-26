@@ -85,6 +85,20 @@ h1 {
 }
 .dialog-title--empty { color: #999; font-style: italic; cursor: default; }
 
+/* Строка метрики запросов (опция меню «Настройки»). Похожа на хелп-плашку:
+   бледный фон, мелкий текст; одна строка под именем беседы. */
+.metrics-line {
+  padding: 6px 16px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6a5b00;
+  background: #fdf6d8;
+  border-bottom: 1px solid rgba(0,0,0,0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .dialog-title-edit {
   margin: 0;
   padding: 12px 16px;
@@ -126,15 +140,83 @@ h1 {
   font-style: italic;
 }
 .dialog-tags-edit {
-  min-width: 260px;
-  max-width: 52%;
-  padding: 6px 10px;
+  min-width: 120px;
+  flex: 1;
+  padding: 4px 8px;
   font-size: 0.9em;
   border: 1px solid rgba(56,121,217,0.6);
   border-radius: 8px;
   background: rgba(56,121,217,0.06);
   box-shadow: none;
 }
+
+/* Редактор тегов (ввод по одному + автоподсказка) */
+.dialog-tags-editor { max-width: 60%; }
+.dialog-tags-editing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dialog-tag-chip--editable { gap: 4px; }
+.dialog-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dialog-tag-remove:hover { opacity: 1; background: rgba(0,0,0,0.12); }
+.dialog-tag-input-wrap { position: relative; flex: 1; min-width: 120px; }
+.dialog-tag-suggest {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.16);
+}
+.dialog-tag-suggest-item {
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #315cae;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dialog-tag-suggest-item.is-active,
+.dialog-tag-suggest-item:hover { background: rgba(57,108,216,0.14); }
+.dialog-tags-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(57,108,216,0.14);
+  color: #315cae;
+  cursor: pointer;
+}
+.dialog-tags-done:hover { background: rgba(57,108,216,0.24); }
 
 /* ---------------------------------------------------------------------------
    Root layout: menu bar (top) + shell (notebooks | container | widgets)
@@ -294,6 +376,117 @@ h1 {
   width: 5px;
   cursor: col-resize;
 }
+
+/* Нижняя секция: поиск бесед по тегам */
+.notebooks-search {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(0,0,0,0.1);
+  background: #f4f4f5;
+}
+.nb-search-results {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.nb-search-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nb-search-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(57,108,216,0.14);
+  color: #315cae;
+  font-size: 12px;
+  cursor: pointer;
+}
+.nb-search-tag:hover { background: rgba(57,108,216,0.26); }
+.nb-search-count {
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.7);
+  color: #315cae;
+  font-size: 10px;
+  text-align: center;
+}
+.nb-search-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #315cae;
+  font-size: 12px;
+  cursor: pointer;
+}
+.nb-search-back:hover { background: rgba(57,108,216,0.12); }
+.nb-search-dialog {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  overflow: hidden;
+}
+.nb-search-dialog .nb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-search-dialog:hover { background: rgba(0,0,0,0.05); }
+.nb-search-dialog--active { background: rgba(97,160,255,0.22); }
+.nb-search-empty {
+  padding: 4px 2px;
+  font-size: 12px;
+  color: #8a8a8a;
+  font-style: italic;
+}
+.nb-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+}
+.nb-search-input {
+  flex: 1;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  background: #fff;
+}
+.nb-search-clear {
+  position: absolute;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  color: #555;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.nb-search-clear:hover { background: rgba(0,0,0,0.16); }
 
 /* Свёрнутый рельс */
 .notebooks-rail {
@@ -867,6 +1060,133 @@ h1 {
   display: none;
 }
 
+/* Узел-артефакт (D-092): плашка с иконкой типа и расширением */
+.message--artifact {
+  align-self: center;
+  max-width: 92%;
+  width: 92%;
+}
+
+.message--artifact-broken {
+  opacity: 0.7;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Вложения внутри ответа ассистента (картинки от LLM) */
+.message-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.artifact-plaque {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(57, 108, 216, 0.35);
+  border-radius: 10px;
+  background: rgba(57, 108, 216, 0.06);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  box-shadow: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.artifact-plaque:hover:not(:disabled) {
+  background: rgba(57, 108, 216, 0.11);
+  border-color: rgba(57, 108, 216, 0.55);
+}
+
+.artifact-plaque:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.artifact-plaque-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(57, 108, 216, 0.12);
+  color: #2f5bb8;
+}
+
+.artifact-kind-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.artifact-plaque-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.artifact-plaque-ext {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #2f5bb8;
+  line-height: 1.1;
+}
+
+.artifact-plaque-name {
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.88;
+}
+
+.artifact-plaque-size {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+.artifact-plaque-action {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #396cd8;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(57, 108, 216, 0.1);
+}
+
+.dialog-attach-btn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.dialog-attach-btn:hover:not(:disabled) {
+  background: rgba(57, 108, 216, 0.1);
+  border-color: rgba(57, 108, 216, 0.4);
+}
+
+.dialog-attach-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Панель действий под A-узлом */
 .message-actions {
   display: flex;
@@ -1117,6 +1437,28 @@ h1 {
 
 /* Превью уплотнения — тот же хром, что help-doc (D-008). */
 .preview-doc-body { max-width: none; flex: 1; min-height: 0; }
+
+/* Компактное превью (тегизатор): высота по содержимому — это несколько слов,
+   незачем растягивать на всю центральную область. */
+.preview-doc--compact { flex: 0 0 auto; min-height: 0; }
+.preview-doc--compact .preview-doc-body { flex: 0 0 auto; }
+.preview-doc--compact .preview-doc-text { max-height: none; }
+
+/* Чипы тегов-кандидатов в превью тегизатора (каждый со своим ×). */
+.preview-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-tag-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: 14px;
+  background: rgba(57,108,216,0.14); color: #315cae;
+}
+.preview-tag-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; border: none; border-radius: 999px;
+  background: transparent; color: inherit; font-size: 15px; line-height: 1;
+  cursor: pointer; opacity: 0.7;
+}
+.preview-tag-remove:hover:not(:disabled) { opacity: 1; background: rgba(0,0,0,0.12); }
+.preview-tag-remove:disabled { opacity: 0.4; cursor: default; }
 .preview-doc-text {
   margin: 0; padding: 12px 14px; border-radius: 8px;
   background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.1);
@@ -1137,6 +1479,56 @@ h1 {
   border-color: #396cd8; background: #396cd8; color: #fff;
 }
 .preview-doc-btn-primary:hover:not(:disabled) { background: #2f5bb8; }
+
+/* Настройки плагина в центре (компрессор и др.). */
+.settings-doc-body {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: visible;
+  padding-right: 4px;
+}
+.settings-doc-divider {
+  border: none; border-top: 1px solid rgba(0,0,0,0.12); margin: 4px 0 12px;
+}
+.settings-doc-label {
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px; font-weight: 600; color: #333;
+}
+.settings-doc-select {
+  font-size: 14px; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.2); background: #fff;
+  position: relative;
+  z-index: 2;
+}
+.settings-doc-textarea {
+  font-family: inherit; font-size: 14px; line-height: 1.5;
+  width: 88%;
+  max-width: 980px;
+  align-self: center;
+  box-sizing: border-box;
+  padding: 10px 12px; border-radius: 8px; resize: vertical;
+  border: 1px solid rgba(0,0,0,0.15); min-height: 160px;
+}
+.settings-doc-reset {
+  align-self: flex-start; font-size: 13px; padding: 6px 12px;
+  border-radius: 6px; border: 1px solid rgba(0,0,0,0.15);
+  background: rgba(0,0,0,0.04); cursor: pointer;
+}
+.settings-doc-reset:hover:not(:disabled) { background: rgba(0,0,0,0.09); }
+.settings-doc-reset:disabled { opacity: 0.45; cursor: default; }
+.settings-doc-error {
+  margin: 0; font-size: 13px; color: #b3261e;
+}
+.settings-doc .preview-doc-actions {
+  position: relative;
+  z-index: 1;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
 
 /* Ошибка отправки в LLM — видимая причина, не только консоль. */
 .send-error {
@@ -1293,6 +1685,11 @@ h1 {
   .dialog-title--empty { color: #888; }
   .dialog-title-edit { background: rgba(97,160,255,0.12); color: #f0f0f0; border-bottom-color: rgba(97,160,255,0.7); }
   .dialog-head { border-bottom-color: rgba(255,255,255,0.1); }
+  .metrics-line {
+    color: #d8c98a;
+    background: #2a2718;
+    border-bottom-color: rgba(255,255,255,0.1);
+  }
   .dialog-tag-chip {
     background: rgba(97,160,255,0.22);
     color: #9ec3ff;
@@ -1311,6 +1708,33 @@ h1 {
   .message-content--compressed {
     background-color: rgba(255,255,255,0.05);
     border-color: rgba(255,255,255,0.25);
+  }
+
+  .artifact-plaque {
+    border-color: rgba(97, 160, 255, 0.35);
+    background: rgba(97, 160, 255, 0.08);
+    color: #f0f0f0;
+  }
+  .artifact-plaque:hover:not(:disabled) {
+    background: rgba(97, 160, 255, 0.14);
+    border-color: rgba(97, 160, 255, 0.5);
+  }
+  .artifact-plaque-icon {
+    background: rgba(97, 160, 255, 0.18);
+    color: #61a0ff;
+  }
+  .artifact-plaque-ext { color: #61a0ff; }
+  .artifact-plaque-action {
+    color: #61a0ff;
+    background: rgba(97, 160, 255, 0.15);
+  }
+  .dialog-attach-btn {
+    border-color: rgba(255,255,255,0.2);
+    color: #f0f0f0;
+  }
+  .dialog-attach-btn:hover:not(:disabled) {
+    background: rgba(97, 160, 255, 0.15);
+    border-color: rgba(97, 160, 255, 0.45);
   }
 
   /* Копирование: глобальное правило button в тёмной теме (0,1,1) перебивает
@@ -1402,6 +1826,29 @@ h1 {
   .nb-error button { color: #ff9c8f; }
   .nb-error button:hover { color: #ff7062; }
 
+  .notebooks-search { background: #1f1f1f; border-top-color: rgba(255,255,255,0.1); }
+  .nb-search-results { border-bottom-color: rgba(255,255,255,0.08); }
+  .nb-search-tag { background: rgba(97,160,255,0.18); color: #9ec3ff; }
+  .nb-search-tag:hover { background: rgba(97,160,255,0.3); }
+  .nb-search-count { background: rgba(0,0,0,0.35); color: #9ec3ff; }
+  .nb-search-back { color: #9ec3ff; }
+  .nb-search-back:hover { background: rgba(97,160,255,0.14); }
+  .nb-search-dialog { color: #ddd; }
+  .nb-search-dialog:hover { background: rgba(255,255,255,0.06); }
+  .nb-search-dialog--active { background: rgba(97,160,255,0.22); }
+  .nb-search-empty { color: #9a9a9a; }
+  .nb-search-input { background: #2a2a2a; color: #f0f0f0; border-color: rgba(255,255,255,0.15); }
+  .nb-search-clear { background: rgba(255,255,255,0.12); color: #ccc; }
+  .nb-search-clear:hover { background: rgba(255,255,255,0.22); }
+
+  .dialog-tag-suggest { background: #262626; border-color: rgba(255,255,255,0.15); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .dialog-tag-suggest-item { color: #9ec3ff; }
+  .dialog-tag-suggest-item.is-active,
+  .dialog-tag-suggest-item:hover { background: rgba(97,160,255,0.18); }
+  .dialog-tag-remove:hover { background: rgba(255,255,255,0.18); }
+  .dialog-tags-done { background: rgba(97,160,255,0.18); color: #9ec3ff; }
+  .dialog-tags-done:hover { background: rgba(97,160,255,0.3); }
+
   .scroll-bottom-btn {
     background: #1f1f1f;
     color: #61a0ff;
@@ -1422,11 +1869,26 @@ h1 {
   .help-doc-link { background: #61a0ff; border-color: #61a0ff; color: #111; }
   .help-doc-link:hover { background: #4d8de6; }
   .preview-doc-text { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); color: #dde; }
+  .preview-tag-chip { background: rgba(97,160,255,0.22); color: #9ec3ff; }
+  .preview-tag-remove:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
   .preview-doc-actions { border-top-color: rgba(255,255,255,0.18); }
   .preview-doc-btn { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #ddd; }
   .preview-doc-btn:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
   .preview-doc-btn-primary { background: #61a0ff; border-color: #61a0ff; color: #111; }
   .preview-doc-btn-primary:hover:not(:disabled) { background: #4d8de6; }
+  .settings-doc-divider { border-top-color: rgba(255,255,255,0.18); }
+  .settings-doc-label { color: #dde; }
+  .settings-doc-select {
+    background: #1a1a2e; border-color: rgba(255,255,255,0.2); color: #eee;
+  }
+  .settings-doc-textarea {
+    background: #1a1a2e; border-color: rgba(255,255,255,0.18); color: #eee;
+  }
+  .settings-doc-reset {
+    background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #ddd;
+  }
+  .settings-doc-reset:hover:not(:disabled) { background: rgba(255,255,255,0.16); }
+  .settings-doc-error { color: #ff8a8a; }
   .send-error { background: rgba(255, 99, 99, 0.12); border-color: rgba(255, 99, 99, 0.3); }
   .send-error-text, .send-error-close, .unanswered-error { color: #ff8a8a; }
 

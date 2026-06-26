@@ -16,7 +16,9 @@ import {
   useMemo,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers } from "../widgets/host/types";
+import { open } from "@tauri-apps/plugin-dialog";
+import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, SettingsDoc } from "../widgets/host/types";
+import { parseArtifactExtra, parseMessageAttachments } from "./artifactMedia";
 import type { CapabilityDeps } from "../widgets/host/capabilities";
 import {
   getActiveLlmProvider,
@@ -35,6 +37,7 @@ import type {
   Notebook,
   SendResult,
   BranchCard,
+  Tag,
 } from "./types";
 import { buildLlmMessages } from "./buildLlmMessages";
 import { dispatchWidgetMsg } from "../widgets/host/widgetDispatch";
@@ -68,8 +71,7 @@ export function useDialogController() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [editingTags, setEditingTags] = useState(false);
-  const [dialogTags, setDialogTags] = useState<string[]>([]);
-  const [tagsDraft, setTagsDraft] = useState("");
+  const [dialogTags, setDialogTags] = useState<Tag[]>([]);
   // Граница ПРОСМОТРА (нижний частично видимый узел). Эфемерна: не в БД,
   // отдельна от рабочего курсора lastNodeId (скролл не двигает рабочую позицию).
   // Считается скролл-слоем (observer) и кладётся сюда через onVisibleBoundaryChange.
@@ -124,6 +126,11 @@ export function useDialogController() {
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc | null>(null);
   const previewHandlersRef = useRef<PreviewHandlers | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [settingsDoc, setSettingsDoc] = useState<SettingsDoc | null>(null);
+  const [openingArtifactId, setOpeningArtifactId] = useState<string | null>(null);
+  const [openingAttachmentKey, setOpeningAttachmentKey] = useState<string | null>(null);
+  const [attachBusy, setAttachBusy] = useState(false);
+  const settingsWidgetIdRef = useRef<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Скролл/DOM-слой за императивным handle. Контроллер отдаёт ему ДАННЫЕ и
@@ -239,12 +246,17 @@ export function useDialogController() {
     setPreviewBusy(false);
   }, []);
 
-  const confirmPreview = useCallback(async () => {
+  const closeSettings = useCallback(() => {
+    setSettingsDoc(null);
+    settingsWidgetIdRef.current = null;
+  }, []);
+
+  const confirmPreview = useCallback(async (payload?: { tags?: string[] }) => {
     const handlers = previewHandlersRef.current;
     if (!handlers || previewBusy) return;
     setPreviewBusy(true);
     try {
-      await handlers.onConfirm();
+      await handlers.onConfirm(payload);
       if (handlers.widgetId && handlers.confirmMsg) {
         dispatchWidgetMsg(handlers.widgetId, handlers.confirmMsg);
       }
@@ -270,23 +282,52 @@ export function useDialogController() {
       onFocus,
       getActiveDialogId: () => dialogId,
       onTreeChanged: () => { if (dialogId) loadBranch(dialogId); },
+      onDialogTagsChanged: () => { if (dialogId) loadDialogTags(dialogId); },
       onOpenHelp: (doc) => {
         closePreview();
+        closeSettings();
         setHelpDoc(doc);
       },
       onOpenPreview: (doc, handlers) => {
+        closeSettings();
         setHelpDoc(null);
         setPreviewDoc(doc);
         previewHandlersRef.current = handlers;
       },
       onClosePreview: closePreview,
+      onOpenSettings: (doc) => {
+        closePreview();
+        setHelpDoc(null);
+        setSettingsDoc(doc);
+        settingsWidgetIdRef.current = doc.widgetId;
+      },
+      onRefreshSettings: (doc) => {
+        setSettingsDoc(doc);
+      },
+      onCloseSettings: closeSettings,
     }),
-    [onFocus, dialogId, closePreview],
+    [onFocus, dialogId, closePreview, closeSettings],
   );
 
-  // ---------------------------------------------------------------------------
-  // Диалог
-  // ---------------------------------------------------------------------------
+  const applySettings = useCallback(() => {
+    const wid = settingsWidgetIdRef.current;
+    if (!wid || !settingsDoc) return;
+    dispatchWidgetMsg(wid, { type: 'SETTINGS_APPLY', value: settingsDoc });
+  }, [settingsDoc]);
+
+  const cancelSettings = useCallback(() => {
+    const wid = settingsWidgetIdRef.current;
+    if (wid) dispatchWidgetMsg(wid, { type: 'SETTINGS_CANCEL' });
+  }, []);
+
+  const patchSettingsDoc = useCallback((patch: Partial<SettingsDoc>) => {
+    setSettingsDoc((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
+  const notifySettingsWidget = useCallback((msg: { type: string; value?: unknown; [key: string]: unknown }) => {
+    const wid = settingsWidgetIdRef.current;
+    if (wid) dispatchWidgetMsg(wid, msg);
+  }, []);
 
   // Перечитать дерево блокнотов и список бесед (структурные изменения).
   const reloadTree = useCallback(async () => {
@@ -339,7 +380,7 @@ export function useDialogController() {
 
   async function loadDialogTags(dId: string) {
     try {
-      const tags = await invoke<string[]>("cmd_get_dialog_tags", { dialogId: dId });
+      const tags = await invoke<Tag[]>("cmd_get_dialog_tags", { dialogId: dId });
       setDialogTags(tags);
     } catch (e) {
       console.error("get_dialog_tags failed:", e);
@@ -347,23 +388,47 @@ export function useDialogController() {
     }
   }
 
-  async function commitTags() {
-    setEditingTags(false);
-    if (!dialogId) return;
-
-    const parsed = parseTags(tagsDraft);
-
+  // Подсказка «похожих» тегов из справочника (нечёткое ранжирование в ядре).
+  async function suggestTags(query: string): Promise<Tag[]> {
+    const q = query.trim();
+    if (!q) return [];
     try {
-      const updated = await invoke<string[]>("cmd_set_dialog_tags", {
-        dialogId,
-        tags: parsed,
-      });
-      setDialogTags(updated);
-      await reloadTree();
+      return await invoke<Tag[]>("cmd_suggest_tags", { query: q, limit: 8 });
     } catch (e) {
-      console.error("set_dialog_tags failed:", e);
+      console.error("suggest_tags failed:", e);
+      return [];
     }
   }
+
+  // Добавить тег беседе: либо готовый из справочника (есть tagId), либо новый по
+  // тексту (ядро создаст/найдёт его в справочнике). Тег вводится по одному.
+  async function addTag(arg: { tagId?: string; display?: string }) {
+    if (!dialogId) return;
+    try {
+      let tagId = arg.tagId;
+      if (!tagId) {
+        const display = (arg.display ?? "").trim();
+        if (!display) return;
+        const tag = await invoke<Tag>("cmd_get_or_create_tag", { display });
+        tagId = tag.id;
+      }
+      await invoke("cmd_add_dialog_tag", { dialogId, tagId });
+      await loadDialogTags(dialogId);
+    } catch (e) {
+      console.error("add_dialog_tag failed:", e);
+    }
+  }
+
+  async function removeTag(tagId: string) {
+    if (!dialogId) return;
+    try {
+      await invoke("cmd_remove_dialog_tag", { dialogId, tagId });
+      await loadDialogTags(dialogId);
+    } catch (e) {
+      console.error("remove_dialog_tag failed:", e);
+    }
+  }
+
 
   // Открыть беседу из панели блокнотов (или очистить центр при null).
   // Выходим из служебных режимов, чтобы не показать чужую развилку/ветки.
@@ -399,7 +464,8 @@ export function useDialogController() {
         n.node_type === "assistant_message" ||
         n.node_type === "unanswered_placeholder" ||
         n.node_type === "compressed_summary" ||
-        n.node_type === "compression_placeholder"
+        n.node_type === "compression_placeholder" ||
+        n.node_type === "artifact"
     );
 
     const restored: Message[] = await Promise.all(
@@ -428,8 +494,14 @@ export function useDialogController() {
           childrenCount: n.children_count,
           deletedChildrenCount: deletedCount,
           markers,
+          artifact: n.node_type === "artifact" ? parseArtifactExtra(n.extra) : null,
+          attachments:
+            n.node_type === "assistant_message"
+              ? parseMessageAttachments(n.extra)
+              : [],
+          modelId: n.model_id,
+          pluginId: n.plugin_id,
         };
-
       })
     );
 
@@ -765,6 +837,96 @@ export function useDialogController() {
     await loadBranch(dialogId);
   }
 
+  // ---------------------------------------------------------------------------
+  // Артефакты (D-091/D-092)
+  // ---------------------------------------------------------------------------
+
+  async function attachArtifactFromDisk() {
+    if (!dialogId || attachBusy || loading) return;
+    try {
+      const selected = await open({ multiple: false, directory: false });
+      if (!selected || Array.isArray(selected)) return;
+      setAttachBusy(true);
+      setSendError(null);
+      await invoke("cmd_attach_artifact", { dialogId, sourcePath: selected });
+      await loadBranch(dialogId);
+      scrollRef.current?.scrollToBottom();
+    } catch (e) {
+      console.error("attach_artifact failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAttachBusy(false);
+    }
+  }
+
+  async function openMessageAttachment(messageNodeId: string, index: number) {
+    const key = `${messageNodeId}:${index}`;
+    if (openingAttachmentKey) return;
+    setOpeningAttachmentKey(key);
+    try {
+      setSendError(null);
+      await invoke("cmd_open_message_attachment", { messageNodeId, index });
+    } catch (e) {
+      console.error("open_message_attachment failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOpeningAttachmentKey(null);
+    }
+  }
+
+  async function openArtifact(nodeId: string) {
+    if (openingArtifactId) return;
+    setOpeningArtifactId(nodeId);
+    try {
+      setSendError(null);
+      await invoke("cmd_open_artifact", { nodeId });
+    } catch (e) {
+      console.error("open_artifact failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setOpeningArtifactId(null);
+    }
+  }
+
+  // Запись ответа в БД с устойчивостью к вложениям: пробуем с картинками, а
+  // если invoke падает (например, объём base64 не прошёл через IPC) — повторяем
+  // без media, чтобы текст ответа НЕ потерялся ("ответ есть, картинки нет").
+  async function resolveAnswerResilient(
+    placeholderId: string,
+    pluginId: string,
+    response: { content: string; modelId: string; tokensInput: number; tokensOutput: number; media?: { mime: string; extension: string; base64: string }[] },
+  ): Promise<void> {
+    const hasMedia = !!response.media?.length;
+    if (hasMedia) {
+      console.log(
+        `resolve_answer: media=${response.media!.length}`,
+        response.media!.map((m) => `${m.mime}/${m.base64.length}b64`),
+      );
+    }
+    const base = {
+      placeholderId,
+      content: response.content,
+      modelId: response.modelId,
+      modelRole: "main_dialog",
+      pluginId,
+      tokensCount: response.tokensInput + response.tokensOutput,
+    };
+    try {
+      await invoke<DbNode>("cmd_resolve_answer", {
+        ...base,
+        media: hasMedia ? response.media : null,
+      });
+      setSendError(null);
+    } catch (e) {
+      if (!hasMedia) throw e;
+      console.error("resolve_answer with media failed, retrying text-only:", e);
+      await invoke<DbNode>("cmd_resolve_answer", { ...base, media: null });
+      setSendError(
+        "Картинки не удалось сохранить (см. консоль). Текст ответа сохранён.",
+      );
+    }
+  }
+
   async function sendBranch() {
     if (!input.trim() || loading || !dialogId || !branchingFromId) return;
     const userText = input.trim();
@@ -793,14 +955,7 @@ export function useDialogController() {
       }
       const response = await provider.generateResponse(llmMessages, "main_dialog");
 
-      await invoke<DbNode>("cmd_resolve_answer", {
-        placeholderId: sent.placeholder_id,
-        content: response.content,
-        modelId: response.modelId,
-        modelRole: "main_dialog",
-        tokensCount: response.tokensInput + response.tokensOutput,
-      });
-      setSendError(null);
+      await resolveAnswerResilient(sent.placeholder_id, provider.pluginId, response);
       await loadBranch(dialogId);
     } catch (e) {
       // Ответ не получен — заглушка остаётся в дереве, в ленте покажется
@@ -841,15 +996,7 @@ export function useDialogController() {
       }
       const response = await provider.generateResponse(llmMessages, "main_dialog");
 
-      await invoke<DbNode>("cmd_resolve_answer", {
-        placeholderId: sent.placeholder_id,
-        content: response.content,
-        modelId: response.modelId,
-        modelRole: "main_dialog",
-        tokensCount: response.tokensInput + response.tokensOutput,
-      });
-
-      setSendError(null);
+      await resolveAnswerResilient(sent.placeholder_id, provider.pluginId, response);
       await loadBranch(dId);
     } catch (e) {
       // LLM не ответил: заглушка остаётся unanswered_placeholder.
@@ -903,7 +1050,8 @@ export function useDialogController() {
     activeBranch,
     model: modelFacts,
     activeLlmProviderId,
-    dialogTags,
+    // Виджетам теги едут строками (display-имена) — контракт WidgetFacts.
+    dialogTags: dialogTags.map((tg) => tg.display_name),
   };
 
   // ---------------------------------------------------------------------------
@@ -932,9 +1080,9 @@ export function useDialogController() {
     editingTags,
     setEditingTags,
     dialogTags,
-    tagsDraft,
-    setTagsDraft,
-    commitTags,
+    addTag,
+    removeTag,
+    suggestTags,
     // справка плагина
     helpDoc,
     setHelpDoc,
@@ -942,6 +1090,11 @@ export function useDialogController() {
     previewBusy,
     confirmPreview,
     cancelPreview,
+    settingsDoc,
+    applySettings,
+    cancelSettings,
+    patchSettingsDoc,
+    notifySettingsWidget,
     // действия корня (D-090)
     rootActions,
     // ветвление
@@ -1006,6 +1159,12 @@ export function useDialogController() {
     submitComposer,
     cancelBranching,
     toggleBranching,
+    attachArtifactFromDisk,
+    attachBusy,
+    openArtifact,
+    openingArtifactId,
+    openMessageAttachment,
+    openingAttachmentKey,
     // производное
     isBlocked,
     facts,
@@ -1017,15 +1176,4 @@ export function useDialogController() {
       onSelect: (id: string) => { setActiveLlmProvider(id); },
     },
   };
-}
-
-function parseTags(raw: string): string[] {
-  const parts = raw.split(/[,\s]+/g);
-  const unique: string[] = [];
-  for (const part of parts) {
-    const normalized = part.trim().replace(/^#+/, "").toLowerCase();
-    if (!normalized) continue;
-    if (!unique.includes(normalized)) unique.push(normalized);
-  }
-  return unique.slice(0, 7);
 }

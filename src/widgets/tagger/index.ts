@@ -1,5 +1,7 @@
-// src/widgets/compressor/index.ts
-// Компрессор: рабочий режим в панели, настройки и хелп — в центре (как Help).
+// src/widgets/tagger/index.ts
+// Тегизатор — родной брат Компрессора. Анализирует выбранный маркерами диапазон
+// активной беседы отдельной LLM (свой коннект/модель/промпт) и предлагает теги;
+// по подтверждению теги уходят в справочник и присваиваются всей беседе (merge).
 
 import type {
   WidgetDef,
@@ -12,21 +14,22 @@ import type {
   SettingsDoc,
 } from '../host/types';
 import type { LlmProvider } from '../llm/types';
-import { registerCompressionProvider } from '../llm/compressionRegistry';
+import { registerTaggingProvider } from '../llm/taggingRegistry';
 import { chatCompletion as openRouterChat } from '../openrouter/api';
 import { chatCompletion as geminiChat } from '../gemini/api';
 import { dispatchWidgetMsg } from '../host/widgetDispatch';
 import { buildTranscript } from '../shared/buildTranscript';
 import {
-  buildCompressionMessages,
-  defaultCompressionPrompt,
+  buildTaggingMessages,
+  defaultTaggingPrompt,
   resolveSystemPrompt,
+  parseTagCsv,
 } from './prompts';
 import { ct } from './i18n';
 import {
   PLUGIN_ID,
   type BackendId,
-  type CompressionConfig,
+  type TaggerConfig,
   DEFAULT_MODELS,
   DEFAULT_PROVIDER,
   buildSettingsDoc,
@@ -36,11 +39,11 @@ import {
 } from './settings';
 
 const PLUGIN_VERSION = '0.1.0';
-const ALGORITHM = 'llm-v1';
+const MAX_DIALOG_TAGS = 7;
 
-const LS_PROVIDER = 'compressor.providerId';
-const LS_MODEL = 'compressor.modelId';
-const LS_PROMPT = 'compressor.systemPrompt';
+const LS_PROVIDER = 'tagger.providerId';
+const LS_MODEL = 'tagger.modelId';
+const LS_PROMPT = 'tagger.systemPrompt';
 
 interface BranchMarker {
   nodeId: string;
@@ -51,7 +54,7 @@ interface BranchMarker {
 
 interface State {
   settingsCenterOpen: boolean;
-  config: CompressionConfig;
+  config: TaggerConfig;
   models: { id: string; name: string }[];
   hasApiKey: boolean;
   startNodeId: string | null;
@@ -96,10 +99,10 @@ function readSystemPrompt(): string {
   } catch {
     /* ignore */
   }
-  return defaultCompressionPrompt();
+  return defaultTaggingPrompt();
 }
 
-function readConfig(): CompressionConfig {
+function readConfig(): TaggerConfig {
   const backend = readBackend();
   return {
     backend,
@@ -108,7 +111,7 @@ function readConfig(): CompressionConfig {
   };
 }
 
-function saveConfig(config: CompressionConfig): void {
+function saveConfig(config: TaggerConfig): void {
   try {
     localStorage.setItem(LS_PROVIDER, config.backend);
     localStorage.setItem(LS_MODEL, config.modelId);
@@ -151,7 +154,7 @@ function text(value: string, muted = false): ControlNode {
   return { kind: 'text', value, tone: muted ? 'muted' : 'normal' };
 }
 
-function makeCompressionProvider(config: CompressionConfig, cap: WidgetCapabilities): LlmProvider {
+function makeTaggingProvider(config: TaggerConfig, cap: WidgetCapabilities): LlmProvider {
   const { backend, modelId } = config;
   return {
     pluginId: `${PLUGIN_ID}:${backend}`,
@@ -173,12 +176,12 @@ function makeCompressionProvider(config: CompressionConfig, cap: WidgetCapabilit
   };
 }
 
-function syncCompressionProvider(state: State, cap: WidgetCapabilities): void {
+function syncTaggingProvider(state: State, cap: WidgetCapabilities): void {
   liveState.current = state;
   if (state.hasApiKey && state.config.modelId) {
-    registerCompressionProvider(makeCompressionProvider(state.config, cap));
+    registerTaggingProvider(makeTaggingProvider(state.config, cap));
   } else {
-    registerCompressionProvider(null);
+    registerTaggingProvider(null);
   }
 }
 
@@ -223,7 +226,7 @@ async function openSettingsCenter(state: State, cap: WidgetCapabilities): Promis
   cap.ui.refreshSettings(doc);
 }
 
-async function runCompress(state: State, cap: WidgetCapabilities): Promise<void> {
+async function runTag(state: State, cap: WidgetCapabilities): Promise<void> {
   const systemPrompt = resolveSystemPrompt(state.config.systemPrompt);
   try {
     const range = await cap.markers.resolveLinearRange(
@@ -241,33 +244,32 @@ async function runCompress(state: State, cap: WidgetCapabilities): Promise<void>
           ct('transcript.header', { count, start, end }),
       },
     );
-    const messages = buildCompressionMessages(transcript, systemPrompt);
-    const summary = await cap.model.call('compression', messages);
-    const modelId = liveState.current.config.modelId;
+    const dictionary = await cap.tags.listDictionary();
+    const messages = buildTaggingMessages(transcript, systemPrompt, dictionary);
+    const answer = await cap.model.call('tagging', messages);
+    const proposed = parseTagCsv(answer);
 
-    const attachArgs = {
-      startNodeId: state.startNodeId!,
-      endNodeId: state.endNodeId!,
-      summaryText: summary,
-      placeholderText: null,
-      modelId,
-      provenance: {
-        pluginId: PLUGIN_ID,
-        pluginVersion: PLUGIN_VERSION,
-        algorithm: ALGORITHM,
-        params: {
-          backend: state.config.backend,
-          transcriptChars: transcript.length,
-          customPrompt: systemPrompt.trim() !== defaultCompressionPrompt().trim(),
-        },
-      },
-    };
+    if (proposed.length === 0) {
+      dispatchWidgetMsg(PLUGIN_ID, {
+        type: 'TAG_FAIL',
+        error: ct('error.noTags'),
+      });
+      return;
+    }
 
     cap.ui.openPreview(
-      { title: ct('preview.title'), text: summary, widgetId: PLUGIN_ID },
       {
-        onConfirm: async () => {
-          await cap.compression.attach(attachArgs);
+        title: ct('preview.title'),
+        text: proposed.join(', '),
+        widgetId: PLUGIN_ID,
+        tags: proposed,
+      },
+      {
+        onConfirm: async (payload) => {
+          // WYSIWYG: привязываем ровно то, что осталось в превью после правки
+          // чипов (пользователь мог убрать лишние). Без слияния со старыми.
+          const finalTags = (payload?.tags ?? proposed).slice(0, MAX_DIALOG_TAGS);
+          await cap.tags.setForActiveDialog(finalTags, 'llm');
         },
         onCancel: () => {},
         widgetId: PLUGIN_ID,
@@ -277,32 +279,33 @@ async function runCompress(state: State, cap: WidgetCapabilities): Promise<void>
     );
 
     dispatchWidgetMsg(PLUGIN_ID, {
-      type: 'COMPRESS_DONE',
+      type: 'TAG_DONE',
       previewPending: true,
     });
   } catch (e) {
     dispatchWidgetMsg(PLUGIN_ID, {
-      type: 'COMPRESS_FAIL',
+      type: 'TAG_FAIL',
       error: String(e),
     });
   }
 }
 
-export const compressor: WidgetDef<State> = {
+export const tagger: WidgetDef<State> = {
   manifest: {
     id: PLUGIN_ID,
     title: ct('title'),
-    icon: 'shrink',
+    icon: 'tags',
     defaultOpen: true,
-    order: 20,
+    order: 30,
     surface: 'panel',
     supportedModels: '*',
     capabilities: [
       'markers.read',
-      'compression.attach',
       'model.call',
       'secrets',
       'ui.focus',
+      'tags.read',
+      'tags.write',
     ],
     author: 'core',
     version: PLUGIN_VERSION,
@@ -397,13 +400,13 @@ export const compressor: WidgetDef<State> = {
     children.push({
       kind: 'button',
       label: state.busy
-        ? ct('compressing')
+        ? ct('tagging')
         : ready
-          ? ct('compressRange', { start: startMark!.label, end: endMark!.label })
-          : ct('compress'),
+          ? ct('tagRange', { start: startMark!.label, end: endMark!.label })
+          : ct('tag'),
       disabled: !ready,
       primary: true,
-      onClick: { type: 'COMPRESS' },
+      onClick: { type: 'TAG' },
     });
 
     return { kind: 'stack', children };
@@ -418,7 +421,7 @@ export const compressor: WidgetDef<State> = {
       case '@@mount': {
         const hasApiKey = await refreshHasApiKey(state, cap);
         const next = { ...state, hasApiKey, config: readConfig() };
-        syncCompressionProvider(next, cap);
+        syncTaggingProvider(next, cap);
         return next;
       }
 
@@ -433,7 +436,7 @@ export const compressor: WidgetDef<State> = {
         const backend = String(msg.value) as BackendId;
         const draftPrompt =
           typeof msg.prompt === 'string' ? msg.prompt : state.config.systemPrompt;
-        const config: CompressionConfig = {
+        const config: TaggerConfig = {
           ...state.config,
           backend,
           modelId: DEFAULT_MODELS[backend] ?? state.config.modelId,
@@ -473,7 +476,7 @@ export const compressor: WidgetDef<State> = {
           busy: false,
           error: error && !hasApiKey ? error : null,
         };
-        syncCompressionProvider(next, cap);
+        syncTaggingProvider(next, cap);
         cap.ui.closeSettings();
         return next;
       }
@@ -518,7 +521,7 @@ export const compressor: WidgetDef<State> = {
       case 'PREVIEW_CANCELLED':
         return { ...state, previewPending: false, busy: false, error: null };
 
-      case 'COMPRESS': {
+      case 'TAG': {
         if (!state.startNodeId || !state.endNodeId) {
           return { ...state, error: ct('error.pickRange') };
         }
@@ -527,11 +530,11 @@ export const compressor: WidgetDef<State> = {
         }
         const working = { ...state, busy: true, error: null };
         liveState.current = working;
-        void runCompress(working, cap);
+        void runTag(working, cap);
         return working;
       }
 
-      case 'COMPRESS_DONE':
+      case 'TAG_DONE':
         return {
           ...state,
           busy: false,
@@ -539,12 +542,12 @@ export const compressor: WidgetDef<State> = {
           error: null,
         };
 
-      case 'COMPRESS_FAIL':
+      case 'TAG_FAIL':
         return {
           ...state,
           busy: false,
           previewPending: false,
-          error: String(msg.error ?? ct('error.compressFailed')),
+          error: String(msg.error ?? ct('error.tagFailed')),
         };
 
       default:

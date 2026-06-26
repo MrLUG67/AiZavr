@@ -38,6 +38,14 @@ interface Dialog {
   title: string;
 }
 
+// Подбор тега в поиске: тег справочника + число помеченных им бесед.
+interface TagHit {
+  id: string;
+  name: string;
+  display_name: string;
+  dialog_count: number;
+}
+
 interface NotebooksPanelProps {
   notebooks: Notebook[];
   dialogs: Dialog[];
@@ -109,11 +117,74 @@ export function NotebooksPanel({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const dragRef = useRef<DragItem | null>(null);
 
+  // --- Поиск бесед по тегам (нижняя секция) ---
+  // Запрос всегда управляет подбором тегов; выбор тега проваливает в список
+  // бесед. Сброс — только по X. Клик по беседе не сбрасывает поиск.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchView, setSearchView] = useState<"tags" | "dialogs">("tags");
+  const [matchedTags, setMatchedTags] = useState<TagHit[]>([]);
+  const [selectedTag, setSelectedTag] = useState<TagHit | null>(null);
+  const [matchedDialogs, setMatchedDialogs] = useState<Dialog[]>([]);
+  const searchReqRef = useRef(0);
+
   useEffect(() => { try { localStorage.setItem(LS_OPEN, open ? "1" : "0"); } catch {} }, [open]);
   useEffect(() => { try { localStorage.setItem(LS_WIDTH, String(width)); } catch {} }, [width]);
   useEffect(() => {
     try { localStorage.setItem(LS_EXPANDED, JSON.stringify([...expanded])); } catch {}
   }, [expanded]);
+
+  // Подбор тегов: динамически на каждое изменение запроса, если значимых
+  // символов больше двух. Любая правка запроса возвращает к перечню тегов
+  // (выбранный тег сбрасывается) и сужает список с каждым символом.
+  useEffect(() => {
+    const q = searchQuery.trim().replace(/^#+/, "");
+    if (q.length <= 2) {
+      setMatchedTags([]);
+      setSearchView("tags");
+      setSelectedTag(null);
+      return;
+    }
+    const myId = ++searchReqRef.current;
+    const handle = window.setTimeout(async () => {
+      try {
+        const hits = await invoke<TagHit[]>("cmd_search_dialog_tags", { query: q });
+        if (myId !== searchReqRef.current) return;
+        setMatchedTags(hits);
+        setSearchView("tags");
+        setSelectedTag(null);
+      } catch (e) {
+        console.error("search_dialog_tags failed:", e);
+      }
+    }, 150);
+    return () => window.clearTimeout(handle);
+  }, [searchQuery]);
+
+  async function pickSearchTag(tag: TagHit) {
+    setSelectedTag(tag);
+    setSearchView("dialogs");
+    try {
+      const dls = await invoke<Dialog[]>("cmd_list_dialogs_by_tag", { tagId: tag.id });
+      setMatchedDialogs(dls);
+    } catch (e) {
+      console.error("list_dialogs_by_tag failed:", e);
+      setMatchedDialogs([]);
+    }
+  }
+
+  function backToTags() {
+    setSearchView("tags");
+    setSelectedTag(null);
+    setMatchedDialogs([]);
+  }
+
+  function clearSearch() {
+    searchReqRef.current++;
+    setSearchQuery("");
+    setSearchView("tags");
+    setSelectedTag(null);
+    setMatchedTags([]);
+    setMatchedDialogs([]);
+  }
 
   // Индексы дерева: дети-блокноты и беседы по блокноту.
   const childNotebooks = (parentId: string): Notebook[] =>
@@ -563,6 +634,74 @@ export function NotebooksPanel({
         ) : (
           <p className="notebooks-empty">{t("notebooks.loading")}</p>
         )}
+      </div>
+
+      <div className="notebooks-search">
+        {searchView === "dialogs" ? (
+          <div className="nb-search-results">
+            <button
+              className="nb-search-back"
+              onClick={backToTags}
+              title={t("notebooks.search.back")}
+            >
+              ← #{selectedTag?.display_name}
+            </button>
+            {matchedDialogs.length > 0 ? (
+              matchedDialogs.map((d) => (
+                <div
+                  key={d.id}
+                  className={`nb-search-dialog ${
+                    activeDialogId === d.id ? "nb-search-dialog--active" : ""
+                  }`}
+                  onClick={() => onOpenDialog(d.id)}
+                  title={d.title}
+                >
+                  <span className="nb-icon nb-icon--dialog">💬</span>
+                  <span className="nb-name">{d.title || t("common.untitled")}</span>
+                </div>
+              ))
+            ) : (
+              <div className="nb-search-empty">{t("notebooks.search.noDialogs")}</div>
+            )}
+          </div>
+        ) : searchQuery.trim().replace(/^#+/, "").length > 2 ? (
+          <div className="nb-search-results">
+            {matchedTags.length > 0 ? (
+              <div className="nb-search-tags">
+                {matchedTags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    className="nb-search-tag"
+                    onClick={() => pickSearchTag(tag)}
+                  >
+                    #{tag.display_name}
+                    <span className="nb-search-count">{tag.dialog_count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="nb-search-empty">{t("notebooks.search.noTags")}</div>
+            )}
+          </div>
+        ) : null}
+
+        <div className="nb-search-input-wrap">
+          <input
+            className="nb-search-input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("notebooks.search.placeholder")}
+          />
+          {searchQuery && (
+            <button
+              className="nb-search-clear"
+              onClick={clearSearch}
+              title={t("notebooks.search.clear")}
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="notebooks-resizer" onPointerDown={onResizeStart} />

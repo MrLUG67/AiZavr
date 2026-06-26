@@ -11,6 +11,7 @@
 import type { WidgetDef } from './types';
 import { contextMeter } from '../context-meter';
 import { compressor } from '../compressor';
+import { tagger } from '../tagger';
 import { openrouter } from '../openrouter';
 import { gemini } from '../gemini';
 
@@ -30,6 +31,7 @@ const WIDGETS: Record<string, AnyWidgetDef> = {
   [gemini.manifest.id]: gemini as AnyWidgetDef,
   [contextMeter.manifest.id]: contextMeter as AnyWidgetDef,
   [compressor.manifest.id]: compressor as AnyWidgetDef,
+  [tagger.manifest.id]: tagger as AnyWidgetDef,
 };
 
 // Инвариант ключ===id: ловим рассинхрон на старте, а не молчим.

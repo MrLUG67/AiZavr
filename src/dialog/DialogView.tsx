@@ -18,6 +18,10 @@ import { t } from "../i18n";
 import type { DialogController } from "./useDialogController";
 import { copyToClipboard } from "./clipboard";
 import { MessageContent } from "../renderers/MessageContent";
+import { ArtifactPlaque } from "./ArtifactPlaque";
+import { TagsEditor } from "./TagsEditor";
+import { useMetricsEnabled } from "../settings/metricsSetting";
+import { resolveModelName } from "../widgets/llm/registry";
 
 export function DialogView({ c }: { c: DialogController }): React.ReactElement {
   const {
@@ -35,15 +39,20 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     editingTags,
     setEditingTags,
     dialogTags,
-    tagsDraft,
-    setTagsDraft,
-    commitTags,
+    addTag,
+    removeTag,
+    suggestTags,
     helpDoc,
     setHelpDoc,
     previewDoc,
     previewBusy,
     confirmPreview,
     cancelPreview,
+    settingsDoc,
+    applySettings,
+    cancelSettings,
+    patchSettingsDoc,
+    notifySettingsWidget,
     rootActions,
     branchingFromId,
     composerHeight,
@@ -95,6 +104,12 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     submitComposer,
     cancelBranching,
     toggleBranching,
+    attachArtifactFromDisk,
+    attachBusy,
+    openArtifact,
+    openingArtifactId,
+    openMessageAttachment,
+    openingAttachmentKey,
     isBlocked,
     facts,
   } = c;
@@ -149,6 +164,34 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     }, 0);
   };
 
+  // --- Метрика запросов (опция меню «Настройки») ---
+  const metricsEnabled = useMetricsEnabled();
+  // Редактируемые теги-кандидаты в превью тегизатора: пользователь может убрать
+  // лишние перед подтверждением (каждый чип со своим ×). Сидируем из previewDoc.
+  const [previewTags, setPreviewTags] = useState<string[]>([]);
+  useEffect(() => {
+    setPreviewTags(previewDoc?.tags ?? []);
+  }, [previewDoc]);
+  // Ответ LLM, выбранный кликом — показываем модель ИМЕННО его. null => текущая
+  // рабочая модель (продолжение диалога).
+  const [metricNodeId, setMetricNodeId] = useState<string | null>(null);
+  // Пошла отправка (продолжаем диалог) — возвращаемся к «текущая модель».
+  useEffect(() => { if (loading) setMetricNodeId(null); }, [loading]);
+  // Сменили беседу — сбрасываем выбор.
+  useEffect(() => { setMetricNodeId(null); }, [dialogId]);
+
+  const metricSelected = metricNodeId
+    ? messages.find((m) => m.nodeId === metricNodeId) ?? null
+    : null;
+  // Выбран ответ — плагин/модель ИМЕННО его (из пары «запрос-ответ», поля БД).
+  // Нет выбора (продолжаем диалог) — текущий активный плагин/модель.
+  const metricPluginRaw = metricSelected
+    ? metricSelected.pluginId
+    : facts.activeLlmProviderId;
+  const metricPlugin = metricPluginRaw ? metricPluginRaw.toUpperCase() : t("app.metrics.none");
+  const metricModelRaw = metricSelected ? metricSelected.modelId : facts.model.id;
+  const metricModel = metricModelRaw ? resolveModelName(metricModelRaw) : t("app.metrics.none");
+
   // Пиктограмма копирования (вариант 2): неброская, проявляется при наведении.
   const renderCopyBtn = (text: string) => (
     <button
@@ -161,22 +204,199 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     </button>
   );
 
+  const compressorSettingsTitle = t("widgets.compressor.settings.title");
+  const compressorSettingsIntro = [1, 2, 3, 4].map((i) =>
+    t(`widgets.compressor.settings.intro.${i}`),
+  );
+  const compressorDefaultPrompt = t("widgets.compressor.prompt.default");
+  const compressorPreviewTitle = t("widgets.compressor.preview.title");
+  const taggerPreviewTitle = t("widgets.tagger.preview.title");
+  const previewTitle = previewDoc
+    ? previewDoc.widgetId === "compressor"
+      ? compressorPreviewTitle
+      : previewDoc.widgetId === "tagger"
+        ? taggerPreviewTitle
+        : previewDoc.title
+    : "";
+
   return (
     <main className="container">
-      {previewDoc && (
-        <div className="help-doc preview-doc" role="dialog" aria-label={previewDoc.title}>
+      {settingsDoc && (
+        <div
+          className="help-doc settings-doc"
+          role="dialog"
+          aria-label={
+            settingsDoc.widgetId === "compressor"
+              ? compressorSettingsTitle
+              : settingsDoc.title
+          }
+        >
           <div className="help-doc-head">
-            <h2 className="help-doc-title">{previewDoc.title}</h2>
+            <h2 className="help-doc-title">
+              {settingsDoc.widgetId === "compressor"
+                ? compressorSettingsTitle
+                : settingsDoc.title}
+            </h2>
           </div>
-          <div className="help-doc-body preview-doc-body">
-            <pre className="preview-doc-text">{previewDoc.text}</pre>
+          <div className="help-doc-body settings-doc-body">
+            {(settingsDoc.widgetId === "compressor"
+              ? compressorSettingsIntro
+              : settingsDoc.intro
+            ).map((p, i) => (
+              <p key={i} className="help-doc-para">{p}</p>
+            ))}
+            <hr className="settings-doc-divider" />
+            <label className="settings-doc-label">
+              {t("app.settings.provider")}
+              <select
+                className="settings-doc-select"
+                value={settingsDoc.providerId}
+                onChange={(e) => {
+                  notifySettingsWidget({
+                    type: "SETTINGS_PROVIDER",
+                    value: e.target.value,
+                    prompt: settingsDoc.prompt,
+                  });
+                }}
+              >
+                {settingsDoc.providers.map((p) => (
+                  <option key={p.id} value={p.id} disabled={!p.ready}>
+                    {p.label}{!p.ready ? ` (${t("app.settings.noKey")})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="settings-doc-label">
+              {t("app.settings.model")}
+              <select
+                className="settings-doc-select"
+                value={settingsDoc.modelId}
+                disabled={
+                  settingsDoc.loadingModels ||
+                  !settingsDoc.providers.find((p) => p.id === settingsDoc.providerId)?.ready
+                }
+                onChange={(e) => {
+                  patchSettingsDoc({ modelId: e.target.value });
+                }}
+              >
+                {settingsDoc.loadingModels ? (
+                  <option value="">{t("app.settings.loadingModels")}</option>
+                ) : settingsDoc.models.length === 0 ? (
+                  <option value="">{t("app.settings.noModels")}</option>
+                ) : (
+                  settingsDoc.models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+            <label className="settings-doc-label">
+              {t("app.settings.prompt")}
+              <textarea
+                className="settings-doc-textarea"
+                value={settingsDoc.prompt}
+                rows={10}
+                onChange={(e) => {
+                  patchSettingsDoc({ prompt: e.target.value });
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="settings-doc-reset"
+              disabled={
+                settingsDoc.prompt.trim() ===
+                (settingsDoc.widgetId === "compressor"
+                  ? compressorDefaultPrompt
+                  : settingsDoc.defaultPrompt
+                ).trim()
+              }
+              onClick={() => {
+                patchSettingsDoc({
+                  prompt:
+                    settingsDoc.widgetId === "compressor"
+                      ? compressorDefaultPrompt
+                      : settingsDoc.defaultPrompt,
+                });
+              }}
+            >
+              {t("app.settings.resetPrompt")}
+            </button>
+            {settingsDoc.error && (
+              <p className="settings-doc-error">{settingsDoc.error}</p>
+            )}
           </div>
           <div className="preview-doc-actions">
             <button
               type="button"
               className="preview-doc-btn preview-doc-btn-primary"
-              disabled={previewBusy}
-              onClick={() => { void confirmPreview(); }}
+              onClick={applySettings}
+            >
+              {t("app.settings.apply")}
+            </button>
+            <button
+              type="button"
+              className="preview-doc-btn"
+              onClick={cancelSettings}
+            >
+              {t("app.settings.cancel")}
+            </button>
+          </div>
+        </div>
+      )}
+      {!settingsDoc && previewDoc && (
+        <div
+          className={`help-doc preview-doc ${
+            previewDoc.widgetId === "tagger" ? "preview-doc--compact" : ""
+          }`}
+          role="dialog"
+          aria-label={previewTitle}
+        >
+          <div className="help-doc-head">
+            <h2 className="help-doc-title">
+              {previewTitle}
+            </h2>
+          </div>
+          <div className="help-doc-body preview-doc-body">
+            {previewDoc.tags ? (
+              previewTags.length > 0 ? (
+                <div className="preview-tags">
+                  {previewTags.map((tag, i) => (
+                    <span key={`${tag}-${i}`} className="preview-tag-chip">
+                      #{tag}
+                      <button
+                        type="button"
+                        className="preview-tag-remove"
+                        title={t("app.tags.remove")}
+                        disabled={previewBusy}
+                        onClick={() =>
+                          setPreviewTags((prev) => prev.filter((_, j) => j !== i))
+                        }
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="dialog-tags-empty">{t("app.tags.empty")}</span>
+              )
+            ) : (
+              <pre className="preview-doc-text">{previewDoc.text}</pre>
+            )}
+          </div>
+          <div className="preview-doc-actions">
+            <button
+              type="button"
+              className="preview-doc-btn preview-doc-btn-primary"
+              disabled={previewBusy || (!!previewDoc.tags && previewTags.length === 0)}
+              onClick={() => {
+                void confirmPreview(
+                  previewDoc.tags ? { tags: previewTags } : undefined,
+                );
+              }}
             >
               {previewBusy ? t("app.preview.applying") : t("app.preview.confirm")}
             </button>
@@ -191,7 +411,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
           </div>
         </div>
       )}
-      {!previewDoc && helpDoc && (
+      {!settingsDoc && !previewDoc && helpDoc && (
         <div className="help-doc" role="dialog" aria-label={helpDoc.title}>
           <div className="help-doc-head">
             <h2 className="help-doc-title">{helpDoc.title}</h2>
@@ -223,6 +443,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
         </div>
       )}
       {dialogId ? (
+        <>
         <div className="dialog-head">
           {editingTitle ? (
             <input
@@ -249,39 +470,31 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
             </h1>
           )}
 
-          {editingTags ? (
-            <input
-              className="dialog-tags-edit"
-              autoFocus
-              value={tagsDraft}
-              onChange={(e) => setTagsDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); commitTags(); }
-                else if (e.key === "Escape") { e.preventDefault(); setEditingTags(false); }
-              }}
-              onBlur={commitTags}
-              placeholder={t("app.tags.placeholder")}
-              title={t("app.tags.editHint")}
-            />
-          ) : (
-            <div
-              className="dialog-tags"
-              title={t("app.tags.editHint")}
-              onDoubleClick={() => {
-                setTagsDraft(dialogTags.join(", "));
-                setEditingTags(true);
-              }}
-            >
-              {dialogTags.length > 0 ? (
-                dialogTags.map((tag) => (
-                  <span key={tag} className="dialog-tag-chip">#{tag}</span>
-                ))
-              ) : (
-                <span className="dialog-tags-empty">{t("app.tags.empty")}</span>
-              )}
-            </div>
-          )}
+          <TagsEditor
+            tags={dialogTags}
+            editing={editingTags}
+            setEditing={setEditingTags}
+            onAdd={addTag}
+            onRemove={removeTag}
+            onSuggest={suggestTags}
+          />
+
+          <button
+            type="button"
+            className="dialog-attach-btn"
+            title={t("app.artifact.attachHint")}
+            disabled={!dialogId || loading || attachBusy || isBlocked}
+            onClick={() => { void attachArtifactFromDisk(); }}
+          >
+            {attachBusy ? "…" : "📎"}
+          </button>
         </div>
+        {metricsEnabled && (
+          <div className="metrics-line" role="status">
+            {t("app.metrics.line", { plugin: metricPlugin, model: metricModel })}
+          </div>
+        )}
+        </>
       ) : (
         <h1 className="dialog-title dialog-title--empty">{t("app.noDialog")}</h1>
       )}
@@ -451,6 +664,36 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
             );
           }
 
+          if (m.nodeType === "artifact" && m.artifact) {
+            return (
+              <div
+                key={i}
+                className="message message--artifact"
+                ref={el => { messageEls.current[i] = el; }}
+                data-msg-idx={i}
+              >
+                <ArtifactPlaque
+                  artifact={m.artifact}
+                  busy={openingArtifactId === m.nodeId}
+                  onOpen={() => { void openArtifact(m.nodeId); }}
+                />
+              </div>
+            );
+          }
+
+          if (m.nodeType === "artifact") {
+            return (
+              <div
+                key={i}
+                className="message message--artifact message--artifact-broken"
+                ref={el => { messageEls.current[i] = el; }}
+                data-msg-idx={i}
+              >
+                <p>{t("app.artifact.broken")}</p>
+              </div>
+            );
+          }
+
           return (
             <div
               key={i}
@@ -458,12 +701,26 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
               ref={el => { messageEls.current[i] = el; }}
               data-msg-idx={i}
               onContextMenu={(e) => openCtxMenu(e, m.content)}
+              onClick={m.role === "assistant" ? () => setMetricNodeId(m.nodeId) : undefined}
             >
               <div className="message-content">
                 {m.role === "assistant"
                   ? <MessageContent content={m.content} facts={facts} />
                   : <p>{m.content}</p>}
               </div>
+
+              {m.role === "assistant" && m.attachments.length > 0 && (
+                <div className="message-attachments">
+                  {m.attachments.map((att, attIdx) => (
+                    <ArtifactPlaque
+                      key={`${m.nodeId}-att-${attIdx}`}
+                      artifact={att}
+                      busy={openingAttachmentKey === `${m.nodeId}:${attIdx}`}
+                      onOpen={() => { void openMessageAttachment(m.nodeId, attIdx); }}
+                    />
+                  ))}
+                </div>
+              )}
 
               {m.role === "assistant" && (
                 <div className="message-actions">

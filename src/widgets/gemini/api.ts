@@ -3,6 +3,7 @@
 // тарифа есть лимиты запросов/минуту и в сутки — отсюда отдельная обработка 429.
 import type { ChatMessage } from '../host/types';
 import type { LlmResponse } from '../llm/types';
+import { extractFromGeminiParts } from '../llm/extractMedia';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -32,6 +33,7 @@ interface RawModelsResponse {
 
 interface RawPart {
   text?: string;
+  inlineData?: { mimeType?: string; data?: string };
 }
 
 interface RawCandidate {
@@ -173,10 +175,19 @@ export async function chatCompletion(
   messages: ChatMessage[],
 ): Promise<LlmResponse> {
   const { systemInstruction, contents } = toGeminiContents(messages);
+  const wantsImage = /image/i.test(modelId);
+
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
+  };
+  if (wantsImage) {
+    generationConfig.responseModalities = ['TEXT', 'IMAGE'];
+  }
+
   const payload = JSON.stringify({
     ...(systemInstruction ? { systemInstruction } : {}),
     contents,
-    generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    generationConfig,
   });
 
   let resp: Response;
@@ -214,12 +225,10 @@ export async function chatCompletion(
   }
 
   const candidate = parsed.candidates?.[0];
-  const content = (candidate?.content?.parts ?? [])
-    .map((p) => p.text ?? '')
-    .filter(Boolean)
-    .join('\n');
+  const parts = (candidate?.content?.parts ?? []) as RawPart[];
+  const { text: content, media } = extractFromGeminiParts(parts);
 
-  if (!content) {
+  if (!content && media.length === 0) {
     const reason = candidate?.finishReason ?? 'unknown';
     if (reason === 'SAFETY' || reason === 'PROHIBITED_CONTENT') {
       throw new Error(
@@ -231,8 +240,13 @@ export async function chatCompletion(
     );
   }
 
+  // Ответ только картинкой, без текста — даём заголовок «Ответ:», чтобы плашки
+  // не висели в пустом пузыре без подписи.
+  const finalContent = content || 'Ответ:';
+
   return {
-    content,
+    content: finalContent,
+    media,
     modelId: parsed.modelVersion ?? modelId,
     tokensInput: parsed.usageMetadata?.promptTokenCount ?? 0,
     tokensOutput: parsed.usageMetadata?.candidatesTokenCount ?? 0,

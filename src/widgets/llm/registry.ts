@@ -82,6 +82,14 @@ export function getActiveLlmProvider(): LlmProvider | null {
   return providers.get(activeId) ?? null;
 }
 
+// Человекочитаемое имя модели по id через активного провайдера. Если провайдер
+// имя не знает (или его нет) — возвращаем сам id, чтобы строка метрики не пустела.
+export function resolveModelName(modelId: string): string {
+  if (!modelId) return modelId;
+  const provider = getActiveLlmProvider();
+  return provider?.getModelName?.(modelId) ?? modelId;
+}
+
 export function subscribeLlmProvider(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);

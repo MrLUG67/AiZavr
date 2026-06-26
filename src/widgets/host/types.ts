@@ -208,11 +208,18 @@ export interface WidgetCapabilities {
     openHelp(doc: HelpDoc): void;
     openPreview(doc: PreviewDoc, handlers: PreviewHandlers): void;
     closePreview(): void;
+    /** Интерактивные настройки плагина в центре (хром help-doc). */
+    openSettings(doc: SettingsDoc): void;
+    refreshSettings(doc: SettingsDoc): void;
+    closeSettings(): void;
   };
   // теги диалога: чтение/запись для автоматизации плагинами.
   tags: {
     getForActiveDialog(): Promise<string[]>;
-    setForActiveDialog(tags: string[]): Promise<string[]>;
+    /** Весь справочник тегов (display-имена) — для подсказки моделям. */
+    listDictionary(): Promise<string[]>;
+    /** source — происхождение новых тегов в справочнике ('manual' | 'llm'). */
+    setForActiveDialog(tags: string[], source?: string): Promise<string[]>;
   };
 }
 
@@ -228,15 +235,48 @@ export interface HelpDoc {
 export interface PreviewDoc {
   title: string;
   text: string;
+  /** Для локализации заголовка в DialogView при смене языка. */
+  widgetId?: string;
+  /** Редактируемый список тегов-кандидатов (превью тегизатора): каждый можно
+   *  убрать перед подтверждением. Если задан — превью рисует чипы, не текст. */
+  tags?: string[];
 }
 
 export interface PreviewHandlers {
-  onConfirm: () => void | Promise<void>;
+  /** payload.tags — итоговый набор тегов после правки чипов в превью. */
+  onConfirm: (payload?: { tags?: string[] }) => void | Promise<void>;
   onCancel: () => void;
   /** После onConfirm/onCancel — сообщение виджету-источнику (TEA). */
   widgetId?: string;
   confirmMsg?: WidgetMsg;
   cancelMsg?: WidgetMsg;
+}
+
+export interface SettingsProviderOption {
+  id: string;
+  label: string;
+  /** Есть API-ключ и провайдер готов к вызовам. */
+  ready: boolean;
+}
+
+export interface SettingsModelOption {
+  id: string;
+  label: string;
+}
+
+/** Форма настроек плагина в центре. intro — краткий хелп перед полями. */
+export interface SettingsDoc {
+  widgetId: string;
+  title: string;
+  intro: string[];
+  providerId: string;
+  providers: SettingsProviderOption[];
+  modelId: string;
+  models: SettingsModelOption[];
+  prompt: string;
+  defaultPrompt: string;
+  loadingModels?: boolean;
+  error?: string | null;
 }
 
 // ---------------------------------------------------------------------------

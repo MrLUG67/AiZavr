@@ -19,8 +19,10 @@ import type {
   HelpDoc,
   PreviewDoc,
   PreviewHandlers,
+  SettingsDoc,
 } from './types';
 import { callCompression } from '../llm/compressionRegistry';
+import { callTagging } from '../llm/taggingRegistry';
 
 // ---------------------------------------------------------------------------
 // Сырые формы из Rust (snake_case)
@@ -96,10 +98,16 @@ export interface CapabilityDeps {
   // курсор на заглушку под S) — App перечитывает активную ветку. Координация
   // панель<->центр, как onFocus; плагин про это не знает.
   onTreeChanged: () => void;
+  // теги активного диалога изменены плагином — App перечитывает чипы в шапке
+  // беседы (отдельно от onTreeChanged: ветка не менялась, только теги).
+  onDialogTagsChanged: () => void;
   // плагин просит показать свою справку в центре (вместо диалога). Исполняет App.
   onOpenHelp: (doc: HelpDoc) => void;
   onOpenPreview: (doc: PreviewDoc, handlers: PreviewHandlers) => void;
   onClosePreview: () => void;
+  onOpenSettings: (doc: SettingsDoc) => void;
+  onRefreshSettings: (doc: SettingsDoc) => void;
+  onCloseSettings: () => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -179,6 +187,10 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
           const resp = await callCompression(messages);
           return resp.content;
         }
+        if (role === 'tagging' || role.startsWith('tagging_')) {
+          const resp = await callTagging(messages);
+          return resp.content;
+        }
         return notWired(
           `model.call(role="${role}")`,
           'роль не поддерживается; для диалога используется активный LLM-плагин',
@@ -213,24 +225,42 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
       closePreview(): void {
         deps.onClosePreview();
       },
+      openSettings(doc): void {
+        deps.onOpenSettings(doc);
+      },
+      refreshSettings(doc): void {
+        deps.onRefreshSettings(doc);
+      },
+      closeSettings(): void {
+        deps.onCloseSettings();
+      },
     },
     tags: {
+      // Контракт плагинов остаётся строковым (display-имена тегов); под капотом —
+      // справочник tags (миграция 009), маппим объекты к именам.
       async getForActiveDialog(): Promise<string[]> {
         const dialogId = deps.getActiveDialogId();
         if (!dialogId) return [];
-        return invoke<string[]>('cmd_get_dialog_tags', { dialogId });
+        const tags = await invoke<{ display_name: string }[]>('cmd_get_dialog_tags', { dialogId });
+        return tags.map((t) => t.display_name);
       },
-      async setForActiveDialog(tags: string[]): Promise<string[]> {
+      // Весь справочник тегов (display-имена) — для подсказки модели тегизатора.
+      async listDictionary(): Promise<string[]> {
+        const tags = await invoke<{ display_name: string }[]>('cmd_list_tags');
+        return tags.map((t) => t.display_name);
+      },
+      async setForActiveDialog(tags: string[], source?: string): Promise<string[]> {
         const dialogId = deps.getActiveDialogId();
         if (!dialogId) {
           throw new Error('Нет активного диалога');
         }
-        const updated = await invoke<string[]>('cmd_set_dialog_tags', {
+        const updated = await invoke<{ display_name: string }[]>('cmd_set_dialog_tags', {
           dialogId,
           tags,
+          source: source ?? 'manual',
         });
-        deps.onTreeChanged();
-        return updated;
+        deps.onDialogTagsChanged();
+        return updated.map((t) => t.display_name);
       },
     },
   };
