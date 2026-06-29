@@ -19,6 +19,7 @@ export type CapabilityName =
   | 'compression.attach'
   | 'model.call'
   | 'secrets'
+  | 'config'
   | 'ui.focus'
   | 'tags.read'
   | 'tags.write';
@@ -200,6 +201,15 @@ export interface WidgetCapabilities {
     get(providerId: string): Promise<string | null>;
     delete(providerId: string): Promise<void>;
   };
+  // конфиг плагина в ФАЙЛЕ ядра (D-095): app_data_dir/config/<pluginId>.json.
+  // Плагин отдаёт/получает СВОЙ конфиг как непрозрачный текст (обычно JSON);
+  // pluginId подставляет ХОСТ (из манифеста) — чужой конфиг недоступен.
+  // load() === null => файла нет, плагин строит дефолт. НЕ для эфемерного
+  // UI-хрома (ширина/тема панели) — то остаётся в localStorage ядра.
+  config: {
+    load(): Promise<string | null>;
+    save(json: string): Promise<void>;
+  };
   // намерение в центральный поток — координация панель<->центр (D-072).
   ui: {
     focus(nodeId: string): void;
@@ -208,10 +218,10 @@ export interface WidgetCapabilities {
     openHelp(doc: HelpDoc): void;
     openPreview(doc: PreviewDoc, handlers: PreviewHandlers): void;
     closePreview(): void;
-    /** Интерактивные настройки плагина в центре (хром help-doc). */
-    openSettings(doc: SettingsDoc): void;
-    refreshSettings(doc: SettingsDoc): void;
-    closeSettings(): void;
+    /** Декларативная форма плагина в модалке-оверлее (D-096). */
+    openForm(doc: FormDoc): void;
+    refreshForm(doc: FormDoc): void;
+    closeForm(): void;
   };
   // теги диалога: чтение/запись для автоматизации плагинами.
   tags: {
@@ -252,30 +262,26 @@ export interface PreviewHandlers {
   cancelMsg?: WidgetMsg;
 }
 
-export interface SettingsProviderOption {
-  id: string;
-  label: string;
-  /** Есть API-ключ и провайдер готов к вызовам. */
-  ready: boolean;
-}
+// ---------------------------------------------------------------------------
+// Форма плагина (D-096). Общая декларативная форма, рисуемая ХОСТОМ настоящей
+// модалкой-оверлеем. Плагин присылает СОСТАВ (body: ControlNode, может содержать
+// tabs); ХОСТ держит эфемерное состояние полей и активную вкладку, а плагину
+// отдаёт значения ОДНИМ сообщением submitMsg{value:{values}} по «Применить».
+// Реактивные поля (onChange у контрола) шлют плагину снимок и ждут refreshForm.
+// FormDoc и контролы — ДАННЫЕ → переезжают в окно-за-мостом (D-075) без правок.
+// ---------------------------------------------------------------------------
 
-export interface SettingsModelOption {
-  id: string;
-  label: string;
-}
-
-/** Форма настроек плагина в центре. intro — краткий хелп перед полями. */
-export interface SettingsDoc {
+export interface FormDoc {
   widgetId: string;
   title: string;
-  intro: string[];
-  providerId: string;
-  providers: SettingsProviderOption[];
-  modelId: string;
-  models: SettingsModelOption[];
-  prompt: string;
-  defaultPrompt: string;
-  loadingModels?: boolean;
+  body: ControlNode;
+  submitLabel?: string;
+  cancelLabel?: string;
+  /** Доставляется плагину по «Применить»; хост добавит value = { values }. */
+  submitMsg: WidgetMsg;
+  /** Доставляется плагину по «Отмена»/закрытию (если задан). */
+  cancelMsg?: WidgetMsg;
+  busy?: boolean;
   error?: string | null;
 }
 
@@ -298,6 +304,55 @@ export interface SegOption {
   label: string;
 }
 
+export interface RadioOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+// Вкладка формы (D-096): подпись + поддерево контролов. Активную вкладку держит
+// ХОСТ (эфемерно), плагин её не знает — переключение без round-trip в плагин.
+export interface TabItem {
+  id: string;
+  label: string;
+  child: ControlNode;
+}
+
+/** Строка таблицы моделей (избранное + поиск + фильтр модальностей, D-096). */
+export interface ModalityFlags {
+  txt: boolean;
+  img: boolean;
+  vid: boolean;
+  aud: boolean;
+  other: boolean;
+}
+
+export interface ModelCapabilities {
+  in: ModalityFlags;
+  out: ModalityFlags;
+}
+
+export interface ModelTableRow {
+  id: string;
+  name: string;
+  /** Краткая подпись; при наличии capabilities может строиться автоматически. */
+  comment?: string;
+  /** Нормализованные in/out для фильтра модальностей. */
+  capabilities?: ModelCapabilities;
+}
+
+/** Подписи фильтра модальностей над таблицей (состояние чекбоксов — эфемерно у хоста). */
+export interface ModelTableModalityFilterUi {
+  /** «Вход — что можно отправить» */
+  inputLabel: string;
+  /** «Выход — что модель обязана вернуть» */
+  outputLabel: string;
+  /** Пояснение логики входа (мягкий фильтр). */
+  inputHint?: string;
+  /** Пояснение логики выхода (жёсткий фильтр). */
+  outputHint?: string;
+}
+
 export type ControlNode =
   | { kind: 'stack'; children: ControlNode[] }
   | { kind: 'row'; children: ControlNode[] }
@@ -312,6 +367,36 @@ export type ControlNode =
   | { kind: 'checkbox'; label: string; checked: boolean; disabled?: boolean; onChange: WidgetMsg }
   | { kind: 'segmented'; options: SegOption[]; value: string; onChange: WidgetMsg }
   | { kind: 'preview'; text: string; editable?: boolean; inputType?: 'text' | 'password'; onChange?: WidgetMsg }
+  // --- кирпичи «взрослой» формы (D-096). value/name — для буфера формы у хоста;
+  //     onChange необязателен (реактивные поля, напр. смена провайдера). ---
+  | { kind: 'field'; label: string; hint?: string; child: ControlNode }
+  | { kind: 'select'; name: string; value: string; options: SegOption[]; disabled?: boolean; placeholder?: string; onChange?: WidgetMsg }
+  | { kind: 'radioGroup'; name: string; value: string; options: RadioOption[]; disabled?: boolean; onChange?: WidgetMsg }
+  // Список избранных моделей: радио-выбор + кнопка «−» удалить из избранного.
+  | {
+      kind: 'favoriteModelList';
+      name: string;
+      value: string;
+      items: { id: string; label: string; secondary?: string }[];
+      onRemove: WidgetMsg;
+      disabled?: boolean;
+    }
+  | { kind: 'tabs'; tabs: TabItem[]; defaultTab?: string }
+  | { kind: 'textInput'; name: string; value: string; multiline?: boolean; inputType?: 'text' | 'password'; rows?: number; placeholder?: string; onChange?: WidgetMsg }
+  // Таблица моделей: чекбокс избранного, название, комментарий; поиск и фильтр
+  // модальностей — эфемерные у хоста (не в конфиге плагина).
+  | {
+      kind: 'modelTable';
+      name: string;
+      value: string;
+      rows: ModelTableRow[];
+      disabled?: boolean;
+      searchPlaceholder?: string;
+      onSelectAll?: WidgetMsg;
+      onDeselectAll?: WidgetMsg;
+      /** Если задан — над таблицей рисуются два ряда чекбоксов in/out. */
+      modalityFilter?: ModelTableModalityFilterUi;
+    }
   | { kind: 'overlay'; children: ControlNode[] };
 
 // ---------------------------------------------------------------------------

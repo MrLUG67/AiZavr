@@ -16,13 +16,13 @@
 // ГРУБЫЙ (хост по manifest.supportedModels) и ТОНКИЙ (плагин вернул inactive).
 // Серую плашку обоих рубежей рисует ХОСТ единообразно (host-native, не контрол).
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ControlTree, type Dispatch } from './controls';
 import { registerWidgetDispatch, unregisterWidgetDispatch } from './widgetDispatch';
+import { makeCapabilities, type CapabilityDeps } from './capabilities';
 import type {
   WidgetDef,
   WidgetFacts,
-  WidgetCapabilities,
   WidgetMsg,
   ViewResult,
 } from './types';
@@ -51,9 +51,17 @@ function modelApplicable(
 export function WidgetHost<State>(props: {
   def: WidgetDef<State>;
   facts: WidgetFacts;
-  cap: WidgetCapabilities;
+  capabilityDeps: CapabilityDeps;
 }): React.ReactElement {
-  const { def, facts, cap } = props;
+  const { def, facts, capabilityDeps } = props;
+
+  // Капабилити привязаны к ЭТОМУ виджету (D-095): pluginId = manifest.id берёт
+  // ХОСТ, не плагин — namespacing конфига/секретов форсится ядром. Раньше cap
+  // был один на всю панель; теперь свой на виджет.
+  const cap = useMemo(
+    () => makeCapabilities(capabilityDeps, def.manifest.id),
+    [capabilityDeps, def.manifest.id],
+  );
 
   // initialState вызывается ОДИН раз (контракт). Последующие изменения фактов
   // втекают в view(state, facts), не пересоздают state.

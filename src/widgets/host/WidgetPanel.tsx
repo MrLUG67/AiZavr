@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listWidgets } from './registry';
 import { WidgetHost } from './WidgetHost';
-import { makeCapabilities, type CapabilityDeps } from './capabilities';
+import { type CapabilityDeps } from './capabilities';
 import type { WidgetFacts } from './types';
 import { t } from '../../i18n';
 
@@ -76,9 +76,8 @@ export function WidgetPanel(props: {
   useEffect(() => { try { localStorage.setItem(LS_PINNED, pinned ? '1' : '0'); } catch {} }, [pinned]);
   useEffect(() => { try { localStorage.setItem(LS_WIDTH, String(width)); } catch {} }, [width]);
 
-  // Капабилити собираются один раз на набор зависимостей (не на каждый рендер).
-  const cap = useMemo(() => makeCapabilities(capabilityDeps), [capabilityDeps]);
-
+  // Капабилити теперь строит сам WidgetHost — по одному набору на виджет
+  // (pluginId-namespacing конфига/секретов, D-095). Панель лишь прокидывает deps.
   const widgets = useMemo(() => listWidgets(), []);
 
   // Свёрнутость по id виджета. Начальное: из localStorage, иначе по
@@ -223,7 +222,7 @@ export function WidgetPanel(props: {
               </div>
               {!isCollapsed && (
                 <div className="widget-section-content">
-                  <WidgetHost def={def} facts={facts} cap={cap} />
+                  <WidgetHost def={def} facts={facts} capabilityDeps={capabilityDeps} />
                 </div>
               )}
             </section>

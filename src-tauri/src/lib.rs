@@ -7,6 +7,7 @@ mod markers;
 mod compression;
 mod notebooks;
 mod artifacts;
+mod config;
 
 use db::{DbDialog, DbNode};
 use notebooks::DbNotebook;
@@ -666,6 +667,30 @@ fn cmd_delete_api_key(provider_id: String) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Конфиги плагинов (D-095)
+// ---------------------------------------------------------------------------
+// Файл на плагин: app_data_dir/config/<plugin_id>.json. plugin_id ядро берёт из
+// манифеста виджета (см. WidgetHost), плагин его не подставляет — неймспейсинг
+// форсит ядро. Содержимое для ядра непрозрачно (JSON-текст плагина).
+
+#[tauri::command]
+fn cmd_load_plugin_config(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+) -> Result<Option<String>, String> {
+    config::load(&state.data_dir, &plugin_id)
+}
+
+#[tauri::command]
+fn cmd_save_plugin_config(
+    state: tauri::State<'_, AppState>,
+    plugin_id: String,
+    contents: String,
+) -> Result<(), String> {
+    config::save(&state.data_dir, &plugin_id, &contents)
+}
+
+// ---------------------------------------------------------------------------
 // Точка входа
 // ---------------------------------------------------------------------------
 
@@ -750,6 +775,8 @@ pub fn run() {
             cmd_set_api_key,
             cmd_get_api_key,
             cmd_delete_api_key,
+            cmd_load_plugin_config,
+            cmd_save_plugin_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");

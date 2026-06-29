@@ -1,6 +1,6 @@
 // Плагин OpenRouter — связь с LLM вынесена из ядра.
-// Шестерёнка (левый верх) открывает оверлей настройки API-ключа.
-// Чекбокс «Использовать для ответов» выбирает активный LLM-плагин.
+// Шестерёнка открывает трёхвкладочную форму: избранные / все модели / API Key.
+// Конфиг хранится в файле ядра через cap.config (D-095).
 
 import type {
   WidgetDef,
@@ -10,6 +10,7 @@ import type {
   ViewResult,
   ControlNode,
   ChatMessage,
+  FormDoc,
 } from '../host/types';
 import type { LlmProvider } from '../llm/types';
 import {
@@ -18,61 +19,138 @@ import {
   setActiveLlmProvider,
   getActiveLlmProviderId,
 } from '../llm/registry';
+import {
+  parseLlmConfig,
+  saveLlmConfig,
+  maskApiKey,
+  buildLlmSettingsForm,
+  configFromFormValues,
+  applyRemoveFavorite,
+  seedFavoritesIfEmpty,
+  type LlmPluginConfig,
+  type LlmModelRow,
+} from '../llm/pluginSettings';
+import { dispatchWidgetMsg } from '../host/widgetDispatch';
 import { fetchModels, chatCompletion, type OpenRouterModel } from './api';
+import { OPENROUTER_MODALITY_FILTER_UI } from './settings';
 
 const PLUGIN_ID = 'openrouter';
 const PLUGIN_VERSION = '0.1.0';
 const SECRET_PROVIDER_ID = 'openrouter';
 const LS_MODEL = 'openrouter.selectedModel';
 const DEFAULT_MODEL = 'anthropic/claude-haiku-4-5';
+const KEYS_URL = 'https://openrouter.ai/keys';
 
 interface State {
-  configOpen: boolean;
-  apiKeyInput: string;
+  settingsOpen: boolean;
   hasApiKey: boolean;
   selectedModelId: string;
+  favoriteModelIds: string[];
   models: OpenRouterModel[];
   loadingModels: boolean;
-  pickingModel: boolean;
-  modelFilter: string;
   error: string | null;
+  keyVerifyStatus: 'idle' | 'checking' | 'ok' | 'fail';
+  keyVerifyMessage: string | null;
 }
-
-const KEYS_URL = 'https://openrouter.ai/keys';
 
 function text(value: string, muted = false): ControlNode {
   return { kind: 'text', value, tone: muted ? 'muted' : 'normal' };
 }
 
-function readSavedModel(): string {
-  try {
-    return localStorage.getItem(LS_MODEL) ?? DEFAULT_MODEL;
-  } catch {
-    return DEFAULT_MODEL;
-  }
+function canProcessDialog(model: OpenRouterModel): boolean {
+  return model.capabilities.out.txt;
 }
 
-function saveModel(id: string): void {
+function resolveSelectedModelId(
+  models: OpenRouterModel[],
+  preferred: string,
+): string {
+  if (models.some((m) => m.id === preferred)) return preferred;
+  const dialogCapable = models.find((m) => canProcessDialog(m));
+  return dialogCapable?.id ?? models[0]?.id ?? preferred;
+}
+
+function toModelRows(models: OpenRouterModel[]): LlmModelRow[] {
+  return models.map((m) => ({
+    id: m.id,
+    name: m.name,
+    contextWindow: m.contextWindow,
+    capabilities: m.capabilities,
+  }));
+}
+
+function migrateModelFromLocalStorage(): string | null {
   try {
-    localStorage.setItem(LS_MODEL, id);
+    const v = localStorage.getItem(LS_MODEL);
+    if (v === null) return null;
+    localStorage.removeItem(LS_MODEL);
+    return v || null;
   } catch {
-    /* ignore */
+    return null;
   }
 }
 
 const liveState: { current: State } = {
   current: {
-    configOpen: false,
-    apiKeyInput: '',
+    settingsOpen: false,
     hasApiKey: false,
-    selectedModelId: readSavedModel(),
+    selectedModelId: DEFAULT_MODEL,
+    favoriteModelIds: [],
     models: [],
     loadingModels: false,
-    pickingModel: false,
-    modelFilter: '',
     error: null,
+    keyVerifyStatus: 'idle',
+    keyVerifyMessage: null,
   },
 };
+
+// ---------------------------------------------------------------------------
+// Авто-восстановление при сетевом сбое (нет интернета на старте и т.п.).
+// fetch без связи бросает TypeError → это transient: модели не загрузились не
+// из-за плохого ключа, а из-за сети. Снимать OpenRouter «навсегда» нельзя:
+// повторяем ограниченно с нарастающей паузой и сразу пробуем при возврате связи
+// (событие 'online'). Ошибки ключа/HTTP НЕ повторяем — сами не починятся.
+// Повтор шлём как обычное TEA-сообщение retryLoad самому виджету.
+// ---------------------------------------------------------------------------
+const AUTO_RETRY_DELAYS_MS = [3000, 8000, 20000];
+let autoRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let autoRetryAttempt = 0;
+let onlineListenerBound = false;
+
+function clearAutoRetry(): void {
+  if (autoRetryTimer !== null) {
+    clearTimeout(autoRetryTimer);
+    autoRetryTimer = null;
+  }
+  autoRetryAttempt = 0;
+}
+
+function scheduleAutoRetry(): void {
+  if (autoRetryTimer !== null) return; // уже запланировано
+  if (autoRetryAttempt >= AUTO_RETRY_DELAYS_MS.length) return; // исчерпали — ждём 'online'/ручной повтор
+  const delay = AUTO_RETRY_DELAYS_MS[autoRetryAttempt];
+  autoRetryAttempt += 1;
+  autoRetryTimer = setTimeout(() => {
+    autoRetryTimer = null;
+    const s = liveState.current;
+    if (s.hasApiKey && !isReady(s)) {
+      dispatchWidgetMsg(PLUGIN_ID, { type: 'retryLoad' });
+    }
+  }, delay);
+}
+
+// Связь вернулась — пробуем сразу и перезапускаем backoff с нуля.
+function ensureOnlineListener(): void {
+  if (onlineListenerBound) return;
+  onlineListenerBound = true;
+  window.addEventListener('online', () => {
+    const s = liveState.current;
+    if (s.hasApiKey && !isReady(s)) {
+      clearAutoRetry();
+      dispatchWidgetMsg(PLUGIN_ID, { type: 'retryLoad' });
+    }
+  });
+}
 
 function makeProvider(cap: WidgetCapabilities): LlmProvider {
   return {
@@ -102,14 +180,13 @@ function makeProvider(cap: WidgetCapabilities): LlmProvider {
   };
 }
 
-// ГОТОВНОСТЬ: ключ есть И модели успешно загружены (доказательство валидности
-// ключа) И выбранная модель присутствует в списке. Регистрируемся при готовности
-// НЕЗАВИСИМО от активности (расцепление: активность выбирает хедер ядра).
 function isReady(state: State): boolean {
+  const selected = state.models.find((m) => m.id === state.selectedModelId);
   return (
     state.hasApiKey &&
     state.models.length > 0 &&
-    state.models.some((m) => m.id === state.selectedModelId)
+    selected !== undefined &&
+    canProcessDialog(selected)
   );
 }
 
@@ -118,102 +195,109 @@ function syncProvider(state: State, cap: WidgetCapabilities): void {
   if (isReady(state)) {
     registerLlmProvider(makeProvider(cap));
   } else {
-    // не готов (нет/невалиден ключ, модели не загрузились) — снимаем регистрацию.
-    // Реестр сам сбросит активность, если этот провайдер был активным.
     unregisterLlmProvider(PLUGIN_ID);
   }
 }
 
 async function loadModels(
   cap: WidgetCapabilities,
-): Promise<{ models: OpenRouterModel[]; error: string | null }> {
-  const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
-  if (!apiKey) return { models: [], error: 'API key not set' };
+  apiKey?: string,
+): Promise<{ models: OpenRouterModel[]; error: string | null; transient: boolean }> {
+  const key = apiKey ?? (await cap.secrets.get(SECRET_PROVIDER_ID));
+  if (!key) return { models: [], error: 'API key not set', transient: false };
   try {
-    const models = await fetchModels(apiKey);
-    return { models, error: null };
+    const models = await fetchModels(key);
+    return { models, error: null, transient: false };
   } catch (e) {
-    return { models: [], error: String(e) };
+    // fetch при отсутствии сети бросает TypeError → transient (повторяемо).
+    // HTTP/ключевые ошибки (Error с кодом статуса) — не transient.
+    const transient = e instanceof TypeError;
+    const error = transient
+      ? 'Нет связи с сервером OpenRouter — проверьте интернет.'
+      : String(e);
+    return { models: [], error, transient };
   }
 }
 
-function filteredModels(state: State): OpenRouterModel[] {
-  const q = state.modelFilter.trim().toLowerCase();
-  if (!q) return state.models;
-  return state.models.filter(
-    (m) =>
-      m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
+async function adoptModels(
+  state: State,
+  models: OpenRouterModel[],
+  error: string | null,
+  cap: WidgetCapabilities,
+  config: LlmPluginConfig,
+): Promise<State> {
+  let nextConfig = seedFavoritesIfEmpty(
+    config,
+    models.map((m) => m.id),
   );
-}
-
-function configOverlay(state: State): ControlNode {
+  if (models.length > 0 && !models.some((m) => m.id === nextConfig.selectedModelId)) {
+    nextConfig = {
+      ...nextConfig,
+      selectedModelId: resolveSelectedModelId(models, nextConfig.selectedModelId),
+    };
+    await saveLlmConfig(cap, PLUGIN_ID, nextConfig);
+  }
   return {
-    kind: 'overlay',
-    children: [
-      {
-        kind: 'row',
-        children: [
-          text(
-            state.hasApiKey
-              ? 'Введите новый ключ, чтобы заменить текущий.'
-              : 'API-ключ OpenRouter',
-            true,
-          ),
-          {
-            kind: 'iconButton',
-            icon: '(?)',
-            title: 'Как получить API-ключ',
-            onClick: { type: 'openHelp' },
-          },
-        ],
-      },
-      {
-        kind: 'preview',
-        text: state.apiKeyInput,
-        editable: true,
-        inputType: 'password',
-        onChange: { type: 'apiKeyInput' },
-      },
-      ...(state.hasApiKey
-        ? [
-            {
-              kind: 'button' as const,
-              label: 'Удалить ключ',
-              onClick: { type: 'deleteApiKey' },
-            },
-          ]
-        : []),
-      {
-        kind: 'row',
-        children: [
-          { kind: 'spacer' },
-          {
-            kind: 'button',
-            label: 'Ок',
-            primary: true,
-            onClick: { type: 'configOk' },
-          },
-          { kind: 'spacer' },
-        ],
-      },
-    ],
+    ...state,
+    models,
+    loadingModels: false,
+    error,
+    selectedModelId: nextConfig.selectedModelId,
+    favoriteModelIds: nextConfig.favoriteModelIds,
   };
 }
 
-// Пошаговая справка получения API-ключа OpenRouter — показывается в ЦЕНТРЕ
-// (cap.ui.openHelp), не в тесном боксе плагина.
-const HELP_DOC = {
-  title: 'Как получить API-ключ OpenRouter',
-  paragraphs: [
-    '1. Зарегистрируйтесь или войдите на openrouter.ai',
-    '2. Откройте раздел Keys (кнопка ниже)',
-    '3. Нажмите «Create Key» и задайте имя',
-    '4. Скопируйте ключ — он показывается только один раз',
-    '5. Вернитесь в AiZavr, вставьте ключ в поле и нажмите «Ок»',
-    '6. Пополните баланс в разделе Credits, иначе модели не будут отвечать',
-  ],
-  link: { label: 'Открыть openrouter.ai/keys', href: KEYS_URL },
-};
+async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise<FormDoc> {
+  let maskedKey: string | null = null;
+  if (state.hasApiKey) {
+    const key = await cap.secrets.get(SECRET_PROVIDER_ID);
+    if (key) maskedKey = maskApiKey(key);
+  }
+  return buildLlmSettingsForm(
+    {
+      pluginId: PLUGIN_ID,
+      title: 'Настройки OpenRouter',
+      keysUrl: KEYS_URL,
+      keysLinkLabel: 'Открыть openrouter.ai/keys',
+      keyInstructions:
+        'Получите API-ключ на openrouter.ai/keys и вставьте его ниже. ' +
+        'Ключ хранится в системном хранилище.',
+      keyPlaceholder: state.hasApiKey ? '••••••••' : 'sk-or-...',
+    },
+    {
+      hasApiKey: state.hasApiKey,
+      maskedKey,
+      selectedModelId: state.selectedModelId,
+      favoriteModelIds: state.favoriteModelIds,
+      models: toModelRows(state.models),
+      loadingModels: state.loadingModels,
+      error: state.error,
+      keyVerifyStatus: state.keyVerifyStatus,
+      keyVerifyMessage: state.keyVerifyMessage,
+      modalityFilter: OPENROUTER_MODALITY_FILTER_UI,
+    },
+  );
+}
+
+async function openSettingsForm(state: State, cap: WidgetCapabilities): Promise<void> {
+  cap.ui.openForm(await buildSettingsForm(state, cap));
+  if (state.hasApiKey && state.models.length === 0) {
+    const loading = { ...state, loadingModels: true };
+    cap.ui.refreshForm(await buildSettingsForm(loading, cap));
+    const { models, error } = await loadModels(cap);
+    const config: LlmPluginConfig = {
+      selectedModelId: state.selectedModelId,
+      favoriteModelIds: state.favoriteModelIds,
+    };
+    const next = await adoptModels(loading, models, error, cap, config);
+    liveState.current = next;
+    cap.ui.refreshForm(await buildSettingsForm(next, cap));
+  }
+}
+
+async function refreshSettingsForm(state: State, cap: WidgetCapabilities): Promise<void> {
+  cap.ui.refreshForm(await buildSettingsForm(state, cap));
+}
 
 export const openrouter: WidgetDef<State> = {
   manifest: {
@@ -224,43 +308,28 @@ export const openrouter: WidgetDef<State> = {
     order: 5,
     surface: 'panel',
     supportedModels: '*',
-    providesLlm: true, // радио активности в хедере панели (выбор обработчика диалога)
-    capabilities: ['secrets', 'ui.focus'],
+    providesLlm: true,
+    capabilities: ['secrets', 'config', 'ui.focus'],
     author: 'core',
     version: PLUGIN_VERSION,
   },
 
   initialState(): State {
-    return {
-      configOpen: false,
-      apiKeyInput: '',
-      hasApiKey: false,
-      selectedModelId: readSavedModel(),
-      models: [],
-      loadingModels: false,
-      pickingModel: false,
-      modelFilter: '',
-      error: null,
-    };
+    return { ...liveState.current };
   },
 
   view(state: State, facts: WidgetFacts): ViewResult {
     const isActive = facts.activeLlmProviderId === PLUGIN_ID;
     const ready = isReady(state);
     const model = state.models.find((m) => m.id === state.selectedModelId);
-    const visibleModels = filteredModels(state);
 
     const workChildren: ControlNode[] = [];
 
     if (!state.hasApiKey) {
-      workChildren.push(
-        text('Укажите API-ключ (⚙ вверху слева)', true),
-      );
+      workChildren.push(text('Укажите API-ключ (⚙ вверху слева)', true));
     } else if (state.loadingModels) {
       workChildren.push(text('Загрузка моделей…', true));
     } else if (state.models.length === 0) {
-      // ключ есть, но модели не загрузились (невалидный ключ / нет сети) —
-      // даём повтор, чтобы не требовать перезапуск после восстановления связи.
       workChildren.push(
         text('Модели не загружены. Проверьте ключ и соединение.', true),
       );
@@ -270,51 +339,23 @@ export const openrouter: WidgetDef<State> = {
         onClick: { type: 'retryLoad' },
       });
     } else {
-      workChildren.push(
-        text(`Модель: ${model?.name ?? state.selectedModelId}`),
-        text(
-          model
-            ? `Окно: ${model.contextWindow.toLocaleString()} токенов`
-            : 'Модель не найдена в списке — выберите другую',
-          true,
-        ),
-      );
-
-      if (state.pickingModel) {
-        workChildren.push({
-          kind: 'preview',
-          text: state.modelFilter,
-          editable: true,
-          onChange: { type: 'modelFilter' },
-        });
-        if (visibleModels.length === 0) {
-          workChildren.push(text('Нет моделей по фильтру', true));
-        } else {
-          workChildren.push({
-            kind: 'list',
-            items: visibleModels.slice(0, 80).map((m) => ({
-              id: m.id,
-              label: m.name,
-              secondary: m.id,
-              selected: m.id === state.selectedModelId,
-            })),
-            onSelect: { type: 'selectModel' },
-          });
-          if (visibleModels.length > 80) {
-            workChildren.push(
-              text(`Показано 80 из ${visibleModels.length}. Уточните фильтр.`, true),
-            );
-          }
-        }
+      workChildren.push(text(`Модель: ${model?.name ?? state.selectedModelId}`));
+      if (model && !canProcessDialog(model)) {
+        workChildren.push(
+          text(
+            'Не для диалога (нет текстового выхода). Выберите другую на вкладке «Избранные».',
+            true,
+          ),
+        );
+      } else if (model) {
+        workChildren.push(
+          text(`Окно: ${model.contextWindow.toLocaleString()} токенов`, true),
+        );
       } else {
-        workChildren.push({
-          kind: 'button',
-          label: 'Сменить модель',
-          onClick: { type: 'togglePickModel' },
-        });
+        workChildren.push(
+          text('Модель не найдена в списке — выберите другую в ⚙', true),
+        );
       }
-
-      // Статус. Активность выбирается радио в ХЕДЕРЕ панели (не здесь).
       if (isActive) {
         workChildren.push(text('● Обрабатывает диалог', false));
       } else if (ready) {
@@ -326,55 +367,61 @@ export const openrouter: WidgetDef<State> = {
       workChildren.unshift(text(state.error));
     }
 
-    const children: ControlNode[] = [
-      {
-        kind: 'row',
-        children: [
-          {
-            kind: 'iconButton',
-            icon: '⚙',
-            title: 'Настройки API-ключа',
-            onClick: { type: 'openConfig' },
-          },
-          { kind: 'spacer' },
-        ],
-      },
-      ...workChildren,
-    ];
-
-    if (state.configOpen) {
-      children.push(configOverlay(state));
-    }
-
-    return { kind: 'stack', children };
+    return {
+      kind: 'stack',
+      children: [
+        {
+          kind: 'row',
+          children: [
+            {
+              kind: 'iconButton',
+              icon: '⚙',
+              title: 'Настройки',
+              onClick: { type: 'OPEN_SETTINGS' },
+            },
+            { kind: 'spacer' },
+          ],
+        },
+        ...workChildren,
+      ],
+    };
   },
 
   update(msg: WidgetMsg, state: State, cap: WidgetCapabilities): State | Promise<State> {
     if (msg.type === '@@mount') {
       return (async () => {
+        ensureOnlineListener();
+        const raw = await cap.config.load();
+        let config: LlmPluginConfig;
+        if (raw) {
+          config = parseLlmConfig(raw, DEFAULT_MODEL);
+        } else {
+          const migrated = migrateModelFromLocalStorage();
+          config = parseLlmConfig(
+            migrated ? JSON.stringify({ selectedModelId: migrated }) : null,
+            DEFAULT_MODEL,
+          );
+          if (migrated) await saveLlmConfig(cap, PLUGIN_ID, config);
+        }
+
         const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
         const hasApiKey = !!apiKey;
         let next: State = {
           ...state,
+          selectedModelId: config.selectedModelId,
+          favoriteModelIds: config.favoriteModelIds,
           hasApiKey,
-          configOpen: !hasApiKey,
           loadingModels: hasApiKey,
         };
 
         if (hasApiKey) {
-          const { models, error } = await loadModels(cap);
-          next = { ...next, models, loadingModels: false, error };
-          if (
-            models.length > 0 &&
-            !models.some((m) => m.id === next.selectedModelId)
-          ) {
-            next = { ...next, selectedModelId: models[0].id };
-            saveModel(models[0].id);
-          }
+          const { models, error, transient } = await loadModels(cap);
+          next = await adoptModels(next, models, error, cap, config);
+          // Сетевой сбой на старте — не сдаёмся: повторим сами / при возврате связи.
+          if (transient) scheduleAutoRetry();
+          else clearAutoRetry();
         }
 
-        // Регистрируем ДО выбора активного: setActiveLlmProvider примет только
-        // готового (зарегистрированного). Авто-выбор, если активного ещё нет.
         syncProvider(next, cap);
         if (isReady(next) && !getActiveLlmProviderId()) {
           setActiveLlmProvider(PLUGIN_ID);
@@ -383,30 +430,31 @@ export const openrouter: WidgetDef<State> = {
       })();
     }
 
-    if (msg.type === 'openConfig') {
-      const next = { ...state, configOpen: true, apiKeyInput: '', error: null };
+    if (msg.type === 'OPEN_SETTINGS') {
+      const next = {
+        ...state,
+        settingsOpen: true,
+        error: null,
+        keyVerifyStatus: 'idle' as const,
+        keyVerifyMessage: null,
+      };
       liveState.current = next;
+      void openSettingsForm(next, cap);
       return next;
-    }
-
-    if (msg.type === 'openHelp') {
-      // Справка показывается в ЦЕНТРЕ через капабилити (исполняет App).
-      cap.ui.openHelp(HELP_DOC);
-      return state;
     }
 
     if (msg.type === 'retryLoad') {
       return (async () => {
         let next: State = { ...state, loadingModels: true, error: null };
-        const { models, error } = await loadModels(cap);
-        next = { ...next, models, loadingModels: false, error };
-        if (
-          models.length > 0 &&
-          !models.some((m) => m.id === next.selectedModelId)
-        ) {
-          next = { ...next, selectedModelId: models[0].id };
-          saveModel(models[0].id);
-        }
+        const { models, error, transient } = await loadModels(cap);
+        const config: LlmPluginConfig = {
+          selectedModelId: state.selectedModelId,
+          favoriteModelIds: state.favoriteModelIds,
+        };
+        next = await adoptModels(next, models, error, cap, config);
+        // Снова сетевой сбой — планируем следующую попытку; иначе сбрасываем backoff.
+        if (transient) scheduleAutoRetry();
+        else clearAutoRetry();
         syncProvider(next, cap);
         if (isReady(next) && !getActiveLlmProviderId()) {
           setActiveLlmProvider(PLUGIN_ID);
@@ -415,48 +463,33 @@ export const openrouter: WidgetDef<State> = {
       })();
     }
 
-    if (msg.type === 'configOk') {
-      const trimmed = state.apiKeyInput.trim();
-      if (trimmed) {
-        return (async () => {
-          await cap.secrets.set(SECRET_PROVIDER_ID, trimmed);
-          let next: State = {
-            ...state,
-            apiKeyInput: '',
-            hasApiKey: true,
-            configOpen: false,
-            loadingModels: true,
-            error: null,
-          };
-          const { models, error } = await loadModels(cap);
-          next = { ...next, models, loadingModels: false, error };
-          if (
-            models.length > 0 &&
-            !models.some((m) => m.id === next.selectedModelId)
-          ) {
-            next = { ...next, selectedModelId: models[0].id };
-            saveModel(models[0].id);
-          }
-          syncProvider(next, cap);
-          if (isReady(next) && !getActiveLlmProviderId()) {
-            setActiveLlmProvider(PLUGIN_ID);
-          }
-          return next;
-        })();
-      }
-      const next = { ...state, configOpen: false };
-      liveState.current = next;
-      return next;
-    }
-
-    if (msg.type === 'apiKeyInput') {
-      const next = { ...state, apiKeyInput: String(msg.value ?? '') };
-      liveState.current = next;
-      return next;
-    }
-
-    if (msg.type === 'deleteApiKey') {
+    if (msg.type === 'FORM_REMOVE_FAVORITE') {
       return (async () => {
+        const modelId =
+          (msg as { modelId?: string; value?: string }).modelId ??
+          (typeof msg.value === 'string' ? msg.value : '');
+        if (!modelId) return state;
+        const values =
+          (msg as { values?: Record<string, string> }).values ?? {};
+        const applied = applyRemoveFavorite(state, modelId, values);
+        const next: State = { ...state, ...applied };
+        liveState.current = next;
+        const raw = await cap.config.load();
+        const existing = parseLlmConfig(raw, DEFAULT_MODEL);
+        await saveLlmConfig(cap, PLUGIN_ID, {
+          ...existing,
+          selectedModelId: next.selectedModelId,
+          favoriteModelIds: next.favoriteModelIds,
+        });
+        syncProvider(next, cap);
+        await refreshSettingsForm(next, cap);
+        return next;
+      })();
+    }
+
+    if (msg.type === 'FORM_DELETE_KEY') {
+      return (async () => {
+        clearAutoRetry(); // нет ключа — повторять нечего
         await cap.secrets.delete(SECRET_PROVIDER_ID);
         if (getActiveLlmProviderId() === PLUGIN_ID) {
           setActiveLlmProvider(null);
@@ -464,44 +497,153 @@ export const openrouter: WidgetDef<State> = {
         unregisterLlmProvider(PLUGIN_ID);
         const next: State = {
           ...state,
-          apiKeyInput: '',
           hasApiKey: false,
           models: [],
-          configOpen: true,
+          loadingModels: false,
           error: null,
+          keyVerifyStatus: 'idle',
+          keyVerifyMessage: null,
         };
         liveState.current = next;
+        await refreshSettingsForm(next, cap);
         return next;
       })();
     }
 
-    if (msg.type === 'selectModel') {
-      const modelId = String(msg.value ?? '');
-      if (!modelId) return state;
-      saveModel(modelId);
-      const next = {
-        ...state,
-        selectedModelId: modelId,
-        pickingModel: false,
-        modelFilter: '',
-        error: null,
-      };
-      syncProvider(next, cap);
-      return next;
+    if (msg.type === 'FORM_VERIFY_KEY') {
+      return (async () => {
+        const values =
+          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+        const apiKeyInput = (values.apiKey ?? '').trim();
+        if (!apiKeyInput) {
+          const next: State = {
+            ...state,
+            keyVerifyStatus: 'fail',
+            keyVerifyMessage: 'Введите ключ для проверки.',
+          };
+          liveState.current = next;
+          await refreshSettingsForm(next, cap);
+          return next;
+        }
+        let next: State = {
+          ...state,
+          keyVerifyStatus: 'checking',
+          keyVerifyMessage: null,
+          error: null,
+        };
+        liveState.current = next;
+        await refreshSettingsForm(next, cap);
+        const { models, error } = await loadModels(cap, apiKeyInput);
+        if (error || models.length === 0) {
+          next = {
+            ...next,
+            keyVerifyStatus: 'fail',
+            keyVerifyMessage: error ?? 'Ключ не прошёл проверку — модели не загружены.',
+          };
+        } else {
+          next = {
+            ...next,
+            keyVerifyStatus: 'ok',
+            keyVerifyMessage: `Ключ действителен. Доступно моделей: ${models.length}.`,
+          };
+        }
+        liveState.current = next;
+        await refreshSettingsForm(next, cap);
+        return next;
+      })();
     }
 
-    if (msg.type === 'togglePickModel') {
-      const next = {
-        ...state,
-        pickingModel: !state.pickingModel,
-        modelFilter: '',
-      };
-      liveState.current = next;
-      return next;
+    if (msg.type === 'FORM_SAVE_KEY') {
+      return (async () => {
+        const values =
+          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+        const apiKeyInput = (values.apiKey ?? '').trim();
+        if (!apiKeyInput) {
+          const next: State = {
+            ...state,
+            keyVerifyStatus: 'fail',
+            keyVerifyMessage: 'Введите ключ для сохранения.',
+          };
+          liveState.current = next;
+          await refreshSettingsForm(next, cap);
+          return next;
+        }
+        await cap.secrets.set(SECRET_PROVIDER_ID, apiKeyInput);
+        let next: State = {
+          ...state,
+          hasApiKey: true,
+          loadingModels: true,
+          keyVerifyStatus: 'ok',
+          keyVerifyMessage: 'Ключ сохранён.',
+          error: null,
+        };
+        liveState.current = next;
+        await refreshSettingsForm(next, cap);
+        const { models, error, transient } = await loadModels(cap);
+        const config: LlmPluginConfig = {
+          selectedModelId: state.selectedModelId,
+          favoriteModelIds: state.favoriteModelIds,
+        };
+        next = await adoptModels(next, models, error, cap, config);
+        if (transient) scheduleAutoRetry();
+        else clearAutoRetry();
+        syncProvider(next, cap);
+        if (isReady(next) && !getActiveLlmProviderId()) {
+          setActiveLlmProvider(PLUGIN_ID);
+        }
+        liveState.current = next;
+        await refreshSettingsForm(next, cap);
+        return next;
+      })();
     }
 
-    if (msg.type === 'modelFilter') {
-      const next = { ...state, modelFilter: String(msg.value ?? '') };
+    if (msg.type === 'FORM_SUBMIT') {
+      return (async () => {
+        const values =
+          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+        const prevConfig: LlmPluginConfig = {
+          selectedModelId: state.selectedModelId,
+          favoriteModelIds: state.favoriteModelIds,
+        };
+        const config = configFromFormValues(values, prevConfig);
+
+        let next: State = {
+          ...state,
+          settingsOpen: false,
+          selectedModelId: config.selectedModelId,
+          favoriteModelIds: config.favoriteModelIds,
+          error: null,
+          keyVerifyStatus: 'idle',
+          keyVerifyMessage: null,
+        };
+
+        if (
+          next.models.length > 0 &&
+          !next.models.some((m) => m.id === next.selectedModelId)
+        ) {
+          const fallback = resolveSelectedModelId(next.models, config.selectedModelId);
+          next = { ...next, selectedModelId: fallback };
+          config.selectedModelId = fallback;
+        }
+
+        await saveLlmConfig(cap, PLUGIN_ID, config);
+        syncProvider(next, cap);
+        if (isReady(next) && !getActiveLlmProviderId()) {
+          setActiveLlmProvider(PLUGIN_ID);
+        }
+        cap.ui.closeForm();
+        return next;
+      })();
+    }
+
+    if (msg.type === 'FORM_CANCEL') {
+      cap.ui.closeForm();
+      const next = {
+        ...state,
+        settingsOpen: false,
+        keyVerifyStatus: 'idle' as const,
+        keyVerifyMessage: null,
+      };
       liveState.current = next;
       return next;
     }

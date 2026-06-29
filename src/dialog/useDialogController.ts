@@ -17,7 +17,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, SettingsDoc } from "../widgets/host/types";
+import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, FormDoc } from "../widgets/host/types";
 import { parseArtifactExtra, parseMessageAttachments } from "./artifactMedia";
 import type { CapabilityDeps } from "../widgets/host/capabilities";
 import {
@@ -126,11 +126,10 @@ export function useDialogController() {
   const [previewDoc, setPreviewDoc] = useState<PreviewDoc | null>(null);
   const previewHandlersRef = useRef<PreviewHandlers | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
-  const [settingsDoc, setSettingsDoc] = useState<SettingsDoc | null>(null);
+  const [formDoc, setFormDoc] = useState<FormDoc | null>(null);
   const [openingArtifactId, setOpeningArtifactId] = useState<string | null>(null);
   const [openingAttachmentKey, setOpeningAttachmentKey] = useState<string | null>(null);
   const [attachBusy, setAttachBusy] = useState(false);
-  const settingsWidgetIdRef = useRef<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Скролл/DOM-слой за императивным handle. Контроллер отдаёт ему ДАННЫЕ и
@@ -246,9 +245,8 @@ export function useDialogController() {
     setPreviewBusy(false);
   }, []);
 
-  const closeSettings = useCallback(() => {
-    setSettingsDoc(null);
-    settingsWidgetIdRef.current = null;
+  const closeForm = useCallback(() => {
+    setFormDoc(null);
   }, []);
 
   const confirmPreview = useCallback(async (payload?: { tags?: string[] }) => {
@@ -285,49 +283,28 @@ export function useDialogController() {
       onDialogTagsChanged: () => { if (dialogId) loadDialogTags(dialogId); },
       onOpenHelp: (doc) => {
         closePreview();
-        closeSettings();
+        closeForm();
         setHelpDoc(doc);
       },
       onOpenPreview: (doc, handlers) => {
-        closeSettings();
+        closeForm();
         setHelpDoc(null);
         setPreviewDoc(doc);
         previewHandlersRef.current = handlers;
       },
       onClosePreview: closePreview,
-      onOpenSettings: (doc) => {
+      onOpenForm: (doc) => {
         closePreview();
         setHelpDoc(null);
-        setSettingsDoc(doc);
-        settingsWidgetIdRef.current = doc.widgetId;
+        setFormDoc(doc);
       },
-      onRefreshSettings: (doc) => {
-        setSettingsDoc(doc);
+      onRefreshForm: (doc) => {
+        setFormDoc(doc);
       },
-      onCloseSettings: closeSettings,
+      onCloseForm: closeForm,
     }),
-    [onFocus, dialogId, closePreview, closeSettings],
+    [onFocus, dialogId, closePreview, closeForm],
   );
-
-  const applySettings = useCallback(() => {
-    const wid = settingsWidgetIdRef.current;
-    if (!wid || !settingsDoc) return;
-    dispatchWidgetMsg(wid, { type: 'SETTINGS_APPLY', value: settingsDoc });
-  }, [settingsDoc]);
-
-  const cancelSettings = useCallback(() => {
-    const wid = settingsWidgetIdRef.current;
-    if (wid) dispatchWidgetMsg(wid, { type: 'SETTINGS_CANCEL' });
-  }, []);
-
-  const patchSettingsDoc = useCallback((patch: Partial<SettingsDoc>) => {
-    setSettingsDoc((prev) => (prev ? { ...prev, ...patch } : prev));
-  }, []);
-
-  const notifySettingsWidget = useCallback((msg: { type: string; value?: unknown; [key: string]: unknown }) => {
-    const wid = settingsWidgetIdRef.current;
-    if (wid) dispatchWidgetMsg(wid, msg);
-  }, []);
 
   // Перечитать дерево блокнотов и список бесед (структурные изменения).
   const reloadTree = useCallback(async () => {
@@ -1090,11 +1067,8 @@ export function useDialogController() {
     previewBusy,
     confirmPreview,
     cancelPreview,
-    settingsDoc,
-    applySettings,
-    cancelSettings,
-    patchSettingsDoc,
-    notifySettingsWidget,
+    // декларативная форма плагина (D-096)
+    formDoc,
     // действия корня (D-090)
     rootActions,
     // ветвление

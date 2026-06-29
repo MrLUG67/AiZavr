@@ -2,6 +2,7 @@
 import type { ChatMessage } from '../host/types';
 import type { LlmResponse } from '../llm/types';
 import { extractFromOpenAiContent } from '../llm/extractMedia';
+import { capabilitiesFromOpenRouter } from '../llm/capabilities';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -16,7 +17,11 @@ export interface OpenRouterModel {
   id: string;
   name: string;
   contextWindow: number;
+  /** Сырые теги API (architecture.*_modalities). */
+  inputModalities: string[];
   outputModalities: string[];
+  /** Нормализованные in/out для фильтра и колонки «Комментарий». */
+  capabilities: import('../host/types').ModelCapabilities;
 }
 
 interface RawModel {
@@ -104,14 +109,8 @@ function extractMessageMedia(message: RawMessage | undefined) {
   return media;
 }
 
-function isChatModel(m: RawModel): boolean {
-  const out = m.architecture?.output_modalities;
-  if (!out || out.length === 0) return true;
-  return out.includes('text') || out.includes('image');
-}
-
 export async function fetchModels(apiKey: string): Promise<OpenRouterModel[]> {
-  const resp = await fetch(`${BASE}/models`, {
+  const resp = await fetch(`${BASE}/models?output_modalities=all`, {
     headers: { Authorization: `Bearer ${apiKey}`, ...APP_HEADERS },
   });
   const body = await resp.text();
@@ -120,13 +119,18 @@ export async function fetchModels(apiKey: string): Promise<OpenRouterModel[]> {
   }
   const parsed: RawModelsResponse = JSON.parse(body);
   return (parsed.data ?? [])
-    .filter(isChatModel)
-    .map((m) => ({
-      id: m.id,
-      name: m.name ?? m.id,
-      contextWindow: m.context_length ?? 128000,
-      outputModalities: m.architecture?.output_modalities ?? ['text'],
-    }))
+    .map((m) => {
+      const inputModalities = m.architecture?.input_modalities ?? [];
+      const outputModalities = m.architecture?.output_modalities ?? ['text'];
+      return {
+        id: m.id,
+        name: m.name ?? m.id,
+        contextWindow: m.context_length ?? 128000,
+        inputModalities,
+        outputModalities,
+        capabilities: capabilitiesFromOpenRouter(inputModalities, outputModalities),
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

@@ -1,9 +1,10 @@
 // HTTP-клиент Google Gemini (Generative Language API) — живёт в плагине, не в ядре.
 // Ключ берётся бесплатно в Google AI Studio и привязан к гугл-аккаунту; у бесплатного
 // тарифа есть лимиты запросов/минуту и в сутки — отсюда отдельная обработка 429.
-import type { ChatMessage } from '../host/types';
+import type { ChatMessage, ModelCapabilities } from '../host/types';
 import type { LlmResponse } from '../llm/types';
 import { extractFromGeminiParts } from '../llm/extractMedia';
+import { capabilitiesFromGemini } from '../llm/capabilities';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -16,6 +17,10 @@ export interface GeminiModel {
   id: string; // без префикса "models/", напр. "gemini-2.5-flash"
   name: string; // человекочитаемое (displayName) или id
   contextWindow: number;
+  /** Сырые методы API (для отладки/будущих эвристик). */
+  supportedGenerationMethods: string[];
+  /** Нормализованные in/out для фильтра модальностей (эвристика). */
+  capabilities: ModelCapabilities;
 }
 
 interface RawModel {
@@ -58,20 +63,14 @@ function stripPrefix(name: string): string {
   return name.startsWith('models/') ? name.slice('models/'.length) : name;
 }
 
-// Под generateContent просачиваются НЕтекстовые и узкоспециальные модели
-// (озвучка, генерация картинок, attributed-QA). Для обычного чата это шум и
-// источник ошибок (выбрал картиночную → ответа нет). Отсеиваем по имени.
-// Сознательно НЕ режем превью/датированные снапшоты Gemini: на бесплатном тарифе
-// новейшая модель порой доступна только под preview-именем — лучше оставить.
-const NON_CHAT = /(^|[-/])(tts|image-generation|audio|aqa)([-/]|$)/i;
-
-function isChatModel(m: RawModel): boolean {
+// Каталог отдаём ПОЛНОСТЬЮ (как у OpenRouter): не-текстовые модели (озвучка,
+// генерация картинок/видео, эмбеддинги) тоже нужны — до них «надо добраться» в
+// оркестровке. Отсев под конкретную задачу делает фильтр модальностей в UI, а
+// пригодность для диалога определяет плагин по capabilities.out.txt. Оставляем
+// только модели с хоть какими-то методами генерации/эмбеддинга.
+function isUsableModel(m: RawModel): boolean {
   const methods = m.supportedGenerationMethods;
-  if (!methods || methods.length === 0) return false;
-  if (!methods.includes('generateContent')) return false;
-  const id = (m.name ?? '').toLowerCase();
-  if (NON_CHAT.test(id)) return false;
-  return true;
+  return !!methods && methods.length > 0;
 }
 
 function friendlyError(status: number, body: string): string {
@@ -124,14 +123,17 @@ export async function fetchModels(apiKey: string): Promise<GeminiModel[]> {
     throw new Error(parsed.error.message);
   }
   return (parsed.models ?? [])
-    .filter(isChatModel)
+    .filter(isUsableModel)
     .map((m) => {
       const full = m.name ?? '';
       const id = stripPrefix(full);
+      const methods = m.supportedGenerationMethods ?? [];
       return {
         id,
         name: m.displayName ?? id,
         contextWindow: m.inputTokenLimit ?? 1_000_000,
+        supportedGenerationMethods: methods,
+        capabilities: capabilitiesFromGemini(id, methods),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));

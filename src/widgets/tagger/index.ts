@@ -11,7 +11,6 @@ import type {
   ViewResult,
   ControlNode,
   ChatMessage,
-  SettingsDoc,
 } from '../host/types';
 import type { LlmProvider } from '../llm/types';
 import { registerTaggingProvider } from '../llm/taggingRegistry';
@@ -32,8 +31,8 @@ import {
   type TaggerConfig,
   DEFAULT_MODELS,
   DEFAULT_PROVIDER,
-  buildSettingsDoc,
-  configFromSettingsDoc,
+  buildSettingsForm,
+  configFromValues,
   loadModelsForBackend,
   providerReady,
 } from './settings';
@@ -41,6 +40,7 @@ import {
 const PLUGIN_VERSION = '0.1.0';
 const MAX_DIALOG_TAGS = 7;
 
+// Старые ключи localStorage — только для одноразовой миграции в файл (D-095).
 const LS_PROVIDER = 'tagger.providerId';
 const LS_MODEL = 'tagger.modelId';
 const LS_PROMPT = 'tagger.systemPrompt';
@@ -73,56 +73,82 @@ const liveState: { current: State } = {
   current: makeInitialState(),
 };
 
-function readBackend(): BackendId {
-  try {
-    const v = localStorage.getItem(LS_PROVIDER);
-    return v === 'gemini' ? 'gemini' : 'openrouter';
-  } catch {
-    return DEFAULT_PROVIDER;
-  }
-}
-
-function readModel(backend: BackendId): string {
-  try {
-    const saved = localStorage.getItem(LS_MODEL);
-    if (saved) return saved;
-  } catch {
-    /* ignore */
-  }
-  return DEFAULT_MODELS[backend];
-}
-
-function readSystemPrompt(): string {
-  try {
-    const saved = localStorage.getItem(LS_PROMPT);
-    if (saved !== null) return resolveSystemPrompt(saved);
-  } catch {
-    /* ignore */
-  }
-  return defaultTaggingPrompt();
-}
-
-function readConfig(): TaggerConfig {
-  const backend = readBackend();
+function defaultConfig(): TaggerConfig {
   return {
-    backend,
-    modelId: readModel(backend),
-    systemPrompt: readSystemPrompt(),
+    backend: DEFAULT_PROVIDER,
+    modelId: DEFAULT_MODELS[DEFAULT_PROVIDER],
+    systemPrompt: defaultTaggingPrompt(),
   };
 }
 
-function saveConfig(config: TaggerConfig): void {
+// Разбор конфига из текста файла (cap.config). Битый/пустой -> дефолт.
+function parseConfig(raw: string | null): TaggerConfig {
+  if (!raw) return defaultConfig();
   try {
-    localStorage.setItem(LS_PROVIDER, config.backend);
-    localStorage.setItem(LS_MODEL, config.modelId);
-    localStorage.setItem(LS_PROMPT, resolveSystemPrompt(config.systemPrompt));
+    const o = JSON.parse(raw) as Partial<TaggerConfig>;
+    const backend: BackendId = o.backend === 'gemini' ? 'gemini' : 'openrouter';
+    return {
+      backend,
+      modelId:
+        typeof o.modelId === 'string' && o.modelId
+          ? o.modelId
+          : DEFAULT_MODELS[backend],
+      systemPrompt:
+        typeof o.systemPrompt === 'string'
+          ? resolveSystemPrompt(o.systemPrompt)
+          : defaultTaggingPrompt(),
+    };
   } catch {
-    /* ignore */
+    return defaultConfig();
+  }
+}
+
+// Одноразовая миграция со старого localStorage-хранения на файл (D-095).
+// Возвращает конфиг, если старые ключи были; заодно их подчищает.
+function migrateFromLocalStorage(): TaggerConfig | null {
+  try {
+    const provider = localStorage.getItem(LS_PROVIDER);
+    const model = localStorage.getItem(LS_MODEL);
+    const prompt = localStorage.getItem(LS_PROMPT);
+    if (provider === null && model === null && prompt === null) return null;
+    const backend: BackendId = provider === 'gemini' ? 'gemini' : 'openrouter';
+    const config: TaggerConfig = {
+      backend,
+      modelId: model || DEFAULT_MODELS[backend],
+      systemPrompt: prompt !== null ? resolveSystemPrompt(prompt) : defaultTaggingPrompt(),
+    };
+    localStorage.removeItem(LS_PROVIDER);
+    localStorage.removeItem(LS_MODEL);
+    localStorage.removeItem(LS_PROMPT);
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+function serializeConfig(config: TaggerConfig): string {
+  return JSON.stringify(
+    {
+      backend: config.backend,
+      modelId: config.modelId,
+      systemPrompt: resolveSystemPrompt(config.systemPrompt),
+    },
+    null,
+    2,
+  );
+}
+
+async function saveConfig(cap: WidgetCapabilities, config: TaggerConfig): Promise<void> {
+  try {
+    await cap.config.save(serializeConfig(config));
+  } catch (e) {
+    console.error('[tagger] save config failed', e);
   }
 }
 
 function makeInitialState(): State {
-  const config = readConfig();
+  // Синхронный старт: дефолты. Реальный конфиг подгрузит @@mount из cap.config.
+  const config = defaultConfig();
   return {
     settingsCenterOpen: false,
     config,
@@ -199,31 +225,19 @@ function resetRangePick(): Partial<State> {
   };
 }
 
-async function refreshHasApiKey(
-  state: State,
-  cap: WidgetCapabilities,
-): Promise<boolean> {
-  return providerReady(state.config.backend, cap);
-}
-
-async function openSettingsCenter(state: State, cap: WidgetCapabilities): Promise<void> {
-  const loadingDoc = await buildSettingsDoc(cap, state.config, state.models, {
-    loadingModels: true,
-  });
-  cap.ui.openSettings(loadingDoc);
+async function openSettingsForm(state: State, cap: WidgetCapabilities): Promise<void> {
+  cap.ui.openForm(
+    await buildSettingsForm(cap, state.config, state.models, { loadingModels: true }),
+  );
 
   const { models, error } = await loadModelsForBackend(state.config.backend, cap);
   let modelId = state.config.modelId;
   if (models.length > 0 && !models.some((m) => m.id === modelId)) {
     modelId = models[0].id;
   }
-  const doc = await buildSettingsDoc(
-    cap,
-    { ...state.config, modelId },
-    models,
-    { error },
+  cap.ui.refreshForm(
+    await buildSettingsForm(cap, { ...state.config, modelId }, models, { error }),
   );
-  cap.ui.refreshSettings(doc);
 }
 
 async function runTag(state: State, cap: WidgetCapabilities): Promise<void> {
@@ -303,6 +317,7 @@ export const tagger: WidgetDef<State> = {
       'markers.read',
       'model.call',
       'secrets',
+      'config',
       'ui.focus',
       'tags.read',
       'tags.write',
@@ -419,8 +434,19 @@ export const tagger: WidgetDef<State> = {
   ): Promise<State> {
     switch (msg.type) {
       case '@@mount': {
-        const hasApiKey = await refreshHasApiKey(state, cap);
-        const next = { ...state, hasApiKey, config: readConfig() };
+        // Конфиг из файла (D-095); при первом запуске после апдейта — миграция
+        // со старого localStorage, иначе дефолт.
+        const raw = await cap.config.load();
+        let config: TaggerConfig;
+        if (raw) {
+          config = parseConfig(raw);
+        } else {
+          const migrated = migrateFromLocalStorage();
+          config = migrated ?? defaultConfig();
+          if (migrated) await saveConfig(cap, migrated);
+        }
+        const hasApiKey = await providerReady(config.backend, cap);
+        const next = { ...state, hasApiKey, config };
         syncTaggingProvider(next, cap);
         return next;
       }
@@ -428,43 +454,54 @@ export const tagger: WidgetDef<State> = {
       case 'OPEN_SETTINGS': {
         const next = { ...state, settingsCenterOpen: true, error: null };
         liveState.current = next;
-        await openSettingsCenter(next, cap);
+        await openSettingsForm(next, cap);
         return next;
       }
 
-      case 'SETTINGS_PROVIDER': {
+      case 'FORM_PROVIDER': {
+        const values = (msg.values as Record<string, string>) ?? {};
         const backend = String(msg.value) as BackendId;
         const draftPrompt =
-          typeof msg.prompt === 'string' ? msg.prompt : state.config.systemPrompt;
+          typeof values.systemPrompt === 'string'
+            ? values.systemPrompt
+            : state.config.systemPrompt;
         const config: TaggerConfig = {
           ...state.config,
           backend,
           modelId: DEFAULT_MODELS[backend] ?? state.config.modelId,
           systemPrompt: draftPrompt,
         };
-        cap.ui.refreshSettings(
-          await buildSettingsDoc(cap, config, [], { loadingModels: true }),
+        cap.ui.refreshForm(
+          await buildSettingsForm(cap, config, [], { loadingModels: true }),
         );
         const { models, error } = await loadModelsForBackend(backend, cap);
         let modelId = config.modelId;
         if (models.length > 0 && !models.some((m) => m.id === modelId)) {
           modelId = models[0].id;
         }
-        cap.ui.refreshSettings(
-          await buildSettingsDoc(
-            cap,
-            { ...config, modelId, systemPrompt: draftPrompt },
-            models,
-            { error },
-          ),
+        cap.ui.refreshForm(
+          await buildSettingsForm(cap, { ...config, modelId }, models, { error }),
         );
         return state;
       }
 
-      case 'SETTINGS_APPLY': {
-        const doc = msg.value as SettingsDoc;
-        const config = configFromSettingsDoc(doc);
-        saveConfig(config);
+      case 'FORM_RESET_PROMPT': {
+        const values = (msg.values as Record<string, string>) ?? {};
+        const config: TaggerConfig = {
+          backend: (values.backend as BackendId) ?? state.config.backend,
+          modelId: values.modelId ?? state.config.modelId,
+          systemPrompt: defaultTaggingPrompt(),
+        };
+        const { models, error } = await loadModelsForBackend(config.backend, cap);
+        cap.ui.refreshForm(await buildSettingsForm(cap, config, models, { error }));
+        return state;
+      }
+
+      case 'FORM_SUBMIT': {
+        const values =
+          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+        const config = configFromValues(values, state.config);
+        await saveConfig(cap, config);
         const hasApiKey = await providerReady(config.backend, cap);
         const { models, error } = await loadModelsForBackend(config.backend, cap);
         const next: State = {
@@ -477,12 +514,12 @@ export const tagger: WidgetDef<State> = {
           error: error && !hasApiKey ? error : null,
         };
         syncTaggingProvider(next, cap);
-        cap.ui.closeSettings();
+        cap.ui.closeForm();
         return next;
       }
 
-      case 'SETTINGS_CANCEL': {
-        cap.ui.closeSettings();
+      case 'FORM_CANCEL': {
+        cap.ui.closeForm();
         return { ...state, settingsCenterOpen: false };
       }
 

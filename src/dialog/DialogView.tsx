@@ -22,6 +22,7 @@ import { ArtifactPlaque } from "./ArtifactPlaque";
 import { TagsEditor } from "./TagsEditor";
 import { useMetricsEnabled } from "../settings/metricsSetting";
 import { resolveModelName } from "../widgets/llm/registry";
+import { FormModal } from "../widgets/host/FormModal";
 
 export function DialogView({ c }: { c: DialogController }): React.ReactElement {
   const {
@@ -48,11 +49,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     previewBusy,
     confirmPreview,
     cancelPreview,
-    settingsDoc,
-    applySettings,
-    cancelSettings,
-    patchSettingsDoc,
-    notifySettingsWidget,
+    formDoc,
     rootActions,
     branchingFromId,
     composerHeight,
@@ -204,11 +201,6 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     </button>
   );
 
-  const compressorSettingsTitle = t("widgets.compressor.settings.title");
-  const compressorSettingsIntro = [1, 2, 3, 4].map((i) =>
-    t(`widgets.compressor.settings.intro.${i}`),
-  );
-  const compressorDefaultPrompt = t("widgets.compressor.prompt.default");
   const compressorPreviewTitle = t("widgets.compressor.preview.title");
   const taggerPreviewTitle = t("widgets.tagger.preview.title");
   const previewTitle = previewDoc
@@ -221,132 +213,8 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
 
   return (
     <main className="container">
-      {settingsDoc && (
-        <div
-          className="help-doc settings-doc"
-          role="dialog"
-          aria-label={
-            settingsDoc.widgetId === "compressor"
-              ? compressorSettingsTitle
-              : settingsDoc.title
-          }
-        >
-          <div className="help-doc-head">
-            <h2 className="help-doc-title">
-              {settingsDoc.widgetId === "compressor"
-                ? compressorSettingsTitle
-                : settingsDoc.title}
-            </h2>
-          </div>
-          <div className="help-doc-body settings-doc-body">
-            {(settingsDoc.widgetId === "compressor"
-              ? compressorSettingsIntro
-              : settingsDoc.intro
-            ).map((p, i) => (
-              <p key={i} className="help-doc-para">{p}</p>
-            ))}
-            <hr className="settings-doc-divider" />
-            <label className="settings-doc-label">
-              {t("app.settings.provider")}
-              <select
-                className="settings-doc-select"
-                value={settingsDoc.providerId}
-                onChange={(e) => {
-                  notifySettingsWidget({
-                    type: "SETTINGS_PROVIDER",
-                    value: e.target.value,
-                    prompt: settingsDoc.prompt,
-                  });
-                }}
-              >
-                {settingsDoc.providers.map((p) => (
-                  <option key={p.id} value={p.id} disabled={!p.ready}>
-                    {p.label}{!p.ready ? ` (${t("app.settings.noKey")})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="settings-doc-label">
-              {t("app.settings.model")}
-              <select
-                className="settings-doc-select"
-                value={settingsDoc.modelId}
-                disabled={
-                  settingsDoc.loadingModels ||
-                  !settingsDoc.providers.find((p) => p.id === settingsDoc.providerId)?.ready
-                }
-                onChange={(e) => {
-                  patchSettingsDoc({ modelId: e.target.value });
-                }}
-              >
-                {settingsDoc.loadingModels ? (
-                  <option value="">{t("app.settings.loadingModels")}</option>
-                ) : settingsDoc.models.length === 0 ? (
-                  <option value="">{t("app.settings.noModels")}</option>
-                ) : (
-                  settingsDoc.models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-            <label className="settings-doc-label">
-              {t("app.settings.prompt")}
-              <textarea
-                className="settings-doc-textarea"
-                value={settingsDoc.prompt}
-                rows={10}
-                onChange={(e) => {
-                  patchSettingsDoc({ prompt: e.target.value });
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="settings-doc-reset"
-              disabled={
-                settingsDoc.prompt.trim() ===
-                (settingsDoc.widgetId === "compressor"
-                  ? compressorDefaultPrompt
-                  : settingsDoc.defaultPrompt
-                ).trim()
-              }
-              onClick={() => {
-                patchSettingsDoc({
-                  prompt:
-                    settingsDoc.widgetId === "compressor"
-                      ? compressorDefaultPrompt
-                      : settingsDoc.defaultPrompt,
-                });
-              }}
-            >
-              {t("app.settings.resetPrompt")}
-            </button>
-            {settingsDoc.error && (
-              <p className="settings-doc-error">{settingsDoc.error}</p>
-            )}
-          </div>
-          <div className="preview-doc-actions">
-            <button
-              type="button"
-              className="preview-doc-btn preview-doc-btn-primary"
-              onClick={applySettings}
-            >
-              {t("app.settings.apply")}
-            </button>
-            <button
-              type="button"
-              className="preview-doc-btn"
-              onClick={cancelSettings}
-            >
-              {t("app.settings.cancel")}
-            </button>
-          </div>
-        </div>
-      )}
-      {!settingsDoc && previewDoc && (
+      {formDoc && <FormModal doc={formDoc} />}
+      {previewDoc && (
         <div
           className={`help-doc preview-doc ${
             previewDoc.widgetId === "tagger" ? "preview-doc--compact" : ""
@@ -411,7 +279,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
           </div>
         </div>
       )}
-      {!settingsDoc && !previewDoc && helpDoc && (
+      {!previewDoc && helpDoc && (
         <div className="help-doc" role="dialog" aria-label={helpDoc.title}>
           <div className="help-doc-head">
             <h2 className="help-doc-title">{helpDoc.title}</h2>

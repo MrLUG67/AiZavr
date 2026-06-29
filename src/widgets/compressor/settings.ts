@@ -1,8 +1,9 @@
-import type { WidgetCapabilities, SettingsDoc } from '../host/types';
+import type { WidgetCapabilities, FormDoc, ControlNode } from '../host/types';
 import { fetchModels as fetchOpenRouterModels } from '../openrouter/api';
 import { fetchModels as fetchGeminiModels } from '../gemini/api';
 import { defaultCompressionPrompt, resolveSystemPrompt } from './prompts';
 import { ct, settingsIntro } from './i18n';
+import { t } from '../../i18n';
 
 export const PLUGIN_ID = 'compressor';
 
@@ -54,40 +55,118 @@ export async function loadModelsForBackend(
   }
 }
 
-export async function buildSettingsDoc(
+// ---------------------------------------------------------------------------
+// Декларативная форма настроек (D-096). Тот же контент, что прежний SettingsDoc,
+// но как общая FormDoc: вкладки «Модель»/«Инструкция», радио провайдера,
+// выпадашка модели, многострочный промпт. Состояние полей держит хост-модалка.
+// ---------------------------------------------------------------------------
+
+export async function buildSettingsForm(
   cap: WidgetCapabilities,
   config: CompressionConfig,
   models: { id: string; name: string }[],
   opts?: { loadingModels?: boolean; error?: string | null },
-): Promise<SettingsDoc> {
+): Promise<FormDoc> {
   const readiness = await Promise.all(
     BACKENDS.map(async (id) => ({ id, ready: await providerReady(id, cap) })),
   );
   const readyMap = Object.fromEntries(readiness.map((r) => [r.id, r.ready]));
+  const providerReadyNow = readyMap[config.backend] ?? false;
+  const modelOptions = models.map((m) => ({ value: m.id, label: m.name }));
+
+  const modelTab: ControlNode = {
+    kind: 'stack',
+    children: [
+      {
+        kind: 'field',
+        label: t('app.settings.provider'),
+        child: {
+          kind: 'radioGroup',
+          name: 'backend',
+          value: config.backend,
+          options: BACKENDS.map((id) => ({
+            value: id,
+            label: PROVIDER_LABELS[id] + (readyMap[id] ? '' : ` (${t('app.settings.noKey')})`),
+          })),
+          onChange: { type: 'FORM_PROVIDER' },
+        },
+      },
+      {
+        kind: 'field',
+        label: t('app.settings.model'),
+        child: {
+          kind: 'select',
+          name: 'modelId',
+          value: config.modelId,
+          disabled: opts?.loadingModels || !providerReadyNow,
+          placeholder: opts?.loadingModels
+            ? t('app.settings.loadingModels')
+            : modelOptions.length === 0
+              ? t('app.settings.noModels')
+              : undefined,
+          options: modelOptions,
+        },
+      },
+    ],
+  };
+
+  const promptTab: ControlNode = {
+    kind: 'stack',
+    children: [
+      {
+        kind: 'field',
+        label: t('app.settings.prompt'),
+        child: {
+          kind: 'textInput',
+          name: 'systemPrompt',
+          value: config.systemPrompt,
+          multiline: true,
+          rows: 10,
+        },
+      },
+      {
+        kind: 'button',
+        label: t('app.settings.resetPrompt'),
+        disabled: config.systemPrompt.trim() === defaultCompressionPrompt().trim(),
+        onClick: { type: 'FORM_RESET_PROMPT' },
+      },
+    ],
+  };
 
   return {
     widgetId: PLUGIN_ID,
     title: ct('settings.title'),
-    intro: settingsIntro(),
-    providerId: config.backend,
-    providers: BACKENDS.map((id) => ({
-      id,
-      label: PROVIDER_LABELS[id],
-      ready: readyMap[id] ?? false,
-    })),
-    modelId: config.modelId,
-    models: models.map((m) => ({ id: m.id, label: m.name })),
-    prompt: config.systemPrompt,
-    defaultPrompt: defaultCompressionPrompt(),
-    loadingModels: opts?.loadingModels,
+    submitLabel: t('app.settings.apply'),
+    cancelLabel: t('app.settings.cancel'),
+    submitMsg: { type: 'FORM_SUBMIT' },
+    cancelMsg: { type: 'FORM_CANCEL' },
+    busy: opts?.loadingModels,
     error: opts?.error ?? null,
+    body: {
+      kind: 'stack',
+      children: [
+        { kind: 'text', value: settingsIntro()[0], tone: 'muted' },
+        {
+          kind: 'tabs',
+          tabs: [
+            { id: 'model', label: ct('settings.tabModel'), child: modelTab },
+            { id: 'prompt', label: ct('settings.tabPrompt'), child: promptTab },
+          ],
+        },
+      ],
+    },
   };
 }
 
-export function configFromSettingsDoc(doc: SettingsDoc): CompressionConfig {
+/** Собрать конфиг из снимка значений формы (D-096). prev — на случай пропусков. */
+export function configFromValues(
+  values: Record<string, string>,
+  prev: CompressionConfig,
+): CompressionConfig {
+  const backend = (values.backend as BackendId) ?? prev.backend;
   return {
-    backend: doc.providerId as BackendId,
-    modelId: doc.modelId,
-    systemPrompt: resolveSystemPrompt(doc.prompt),
+    backend,
+    modelId: values.modelId ?? prev.modelId,
+    systemPrompt: resolveSystemPrompt(values.systemPrompt ?? prev.systemPrompt),
   };
 }

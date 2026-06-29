@@ -19,7 +19,7 @@ import type {
   HelpDoc,
   PreviewDoc,
   PreviewHandlers,
-  SettingsDoc,
+  FormDoc,
 } from './types';
 import { callCompression } from '../llm/compressionRegistry';
 import { callTagging } from '../llm/taggingRegistry';
@@ -105,9 +105,9 @@ export interface CapabilityDeps {
   onOpenHelp: (doc: HelpDoc) => void;
   onOpenPreview: (doc: PreviewDoc, handlers: PreviewHandlers) => void;
   onClosePreview: () => void;
-  onOpenSettings: (doc: SettingsDoc) => void;
-  onRefreshSettings: (doc: SettingsDoc) => void;
-  onCloseSettings: () => void;
+  onOpenForm: (doc: FormDoc) => void;
+  onRefreshForm: (doc: FormDoc) => void;
+  onCloseForm: () => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -119,7 +119,10 @@ function notWired(what: string, when: string): never {
 // Нет: generic invoke, fetch, ключей, хэндла к БД.
 // ---------------------------------------------------------------------------
 
-export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
+export function makeCapabilities(
+  deps: CapabilityDeps,
+  pluginId: string,
+): WidgetCapabilities {
   return {
     // -- markers.read: реально (сессия 7) -----------------------------------
     markers: {
@@ -211,6 +214,18 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
       },
     },
 
+    // -- config: конфиг плагина в файле ядра (D-095) -------------------------
+    //    pluginId привязан к ЭТОМУ cap (per-widget, WidgetHost) — плагин его не
+    //    передаёт, чужой конфиг недоступен by construction.
+    config: {
+      async load(): Promise<string | null> {
+        return invoke<string | null>('cmd_load_plugin_config', { pluginId });
+      },
+      async save(json: string): Promise<void> {
+        await invoke<void>('cmd_save_plugin_config', { pluginId, contents: json });
+      },
+    },
+
     // -- ui.focus / ui.openHelp: намерения в центр, исполняет App -----------
     ui: {
       focus(nodeId: string): void {
@@ -225,14 +240,14 @@ export function makeCapabilities(deps: CapabilityDeps): WidgetCapabilities {
       closePreview(): void {
         deps.onClosePreview();
       },
-      openSettings(doc): void {
-        deps.onOpenSettings(doc);
+      openForm(doc): void {
+        deps.onOpenForm(doc);
       },
-      refreshSettings(doc): void {
-        deps.onRefreshSettings(doc);
+      refreshForm(doc): void {
+        deps.onRefreshForm(doc);
       },
-      closeSettings(): void {
-        deps.onCloseSettings();
+      closeForm(): void {
+        deps.onCloseForm();
       },
     },
     tags: {
