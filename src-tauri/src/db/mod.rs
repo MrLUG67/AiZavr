@@ -613,6 +613,7 @@ pub async fn send_user_message(
     dialog_id: &str,
     parent_id: Option<&str>,
     content: &str,
+    query_extra: Option<&str>,
 ) -> Result<SendResult, sqlx::Error> {
     // 1. Q-узел обычным путём (active_child у родителя, children_count,
     //    root_node_id при необходимости, курсор диалога → Q).
@@ -629,6 +630,16 @@ pub async fn send_user_message(
         0,
     )
     .await?;
+
+    // Вложения запроса (универсальная отправка файлов): пишем extra на Q-узел.
+    // Делается до заглушки, в той же операции отправки — структура регулярна.
+    if let Some(extra) = query_extra {
+        sqlx::query("UPDATE nodes SET extra = ? WHERE id = ?")
+            .bind(extra)
+            .bind(&query_id)
+            .execute(pool)
+            .await?;
+    }
 
     // 2. Заглушка-ответ под Q. create_node сдвинет курсор диалога на неё
     //    и проставит active_child у Q.

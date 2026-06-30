@@ -337,10 +337,42 @@ async fn cmd_send_user_message(
     dialog_id: String,
     parent_id: Option<String>,
     content: String,
+    attachments: Option<Vec<artifacts::AttachmentSource>>,
 ) -> Result<db::SendResult, String> {
-    db::send_user_message(&state.db, &dialog_id, parent_id.as_deref(), &content)
-        .await
-        .map_err(|e| e.to_string())
+    // Подготовить вложения (копия с диска / переиспользование) и собрать extra
+    // ДО создания узлов: если файл не нашёлся/слишком большой — отправка не
+    // состоится, узел в дереве не появится.
+    let query_extra = match attachments.as_ref().filter(|a| !a.is_empty()) {
+        Some(sources) => {
+            let staged = artifacts::stage_outgoing_attachments(&state.data_dir, sources)?;
+            if staged.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({ "attachments": staged }).to_string())
+            }
+        }
+        None => None,
+    };
+
+    db::send_user_message(
+        &state.db,
+        &dialog_id,
+        parent_id.as_deref(),
+        &content,
+        query_extra.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Прочитать вложение по storage_path в base64 — для отправки в LLM.
+#[tauri::command]
+async fn cmd_read_attachment_base64(
+    state: tauri::State<'_, AppState>,
+    storage_path: String,
+    mime: Option<String>,
+) -> Result<artifacts::AttachmentBytes, String> {
+    artifacts::read_attachment_base64(&state.data_dir, &storage_path, mime.as_deref())
 }
 
 /// Перезаписать заглушку реальным ответом LLM
@@ -691,6 +723,41 @@ fn cmd_save_plugin_config(
 }
 
 // ---------------------------------------------------------------------------
+// Экспорт диалога (плагин «Сохранить диалог»)
+// ---------------------------------------------------------------------------
+// Запись готового документа по пути, который пользователь выбрал в диалоге
+// сохранения (JS-сторона через plugin-dialog save()). Контент формирует плагин
+// (TXT/HTML/DOC), ядро только пишет байты — единообразно с остальным файловым IO
+// (artifacts/config), без дополнительной fs-области видимости плагина.
+
+#[tauri::command]
+fn cmd_write_export_file(path: String, contents: String) -> Result<(), String> {
+    write_bytes(&path, contents.as_bytes())
+}
+
+/// Запись бинарного документа (PDF) по выбранному пути: контент приходит как
+/// base64 (pdfmake генерирует на стороне фронта), ядро декодирует и пишет байты.
+#[tauri::command]
+fn cmd_write_export_file_base64(path: String, base64_data: String) -> Result<(), String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_data.trim().as_bytes())
+        .map_err(|e| format!("invalid base64: {e}"))?;
+    write_bytes(&path, &bytes)
+}
+
+fn write_bytes(path: &str, bytes: &[u8]) -> Result<(), String> {
+    let p = std::path::Path::new(path);
+    if let Some(parent) = p.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("cannot create directory: {e}"))?;
+        }
+    }
+    std::fs::write(p, bytes).map_err(|e| format!("write failed: {e}"))
+}
+
+// ---------------------------------------------------------------------------
 // Точка входа
 // ---------------------------------------------------------------------------
 
@@ -763,6 +830,7 @@ pub fn run() {
             cmd_attach_artifact,
             cmd_open_artifact,
             cmd_open_message_attachment,
+            cmd_read_attachment_base64,
             cmd_list_notebooks,
             cmd_create_notebook,
             cmd_rename_notebook,
@@ -777,6 +845,8 @@ pub fn run() {
             cmd_delete_api_key,
             cmd_load_plugin_config,
             cmd_save_plugin_config,
+            cmd_write_export_file,
+            cmd_write_export_file_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AiZavr");

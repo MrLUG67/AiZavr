@@ -62,6 +62,54 @@ pub fn extension_from_filename(filename: &str) -> String {
         .unwrap_or_else(|| "bin".to_string())
 }
 
+/// Грубая догадка MIME по расширению — для отправки вложений в LLM, когда
+/// исходный mime не сохранён (файлы с диска / цитирование старых узлов).
+pub fn mime_from_extension(ext: &str) -> String {
+    let e = ext.trim_start_matches('.').to_ascii_lowercase();
+    match e.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "svg" => "image/svg+xml",
+        "heic" => "image/heic",
+        "avif" => "image/avif",
+        "tiff" | "tif" => "image/tiff",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "flac" => "audio/flac",
+        "ogg" | "oga" => "audio/ogg",
+        "aac" => "audio/aac",
+        "m4a" => "audio/mp4",
+        "opus" => "audio/opus",
+        "mp4" | "m4v" => "video/mp4",
+        "webm" => "video/webm",
+        "mkv" => "video/x-matroska",
+        "mov" => "video/quicktime",
+        "avi" => "video/x-msvideo",
+        "mpeg" | "mpg" => "video/mpeg",
+        "pdf" => "application/pdf",
+        "txt" | "md" => "text/plain",
+        "csv" => "text/csv",
+        "json" => "application/json",
+        "xml" => "application/xml",
+        "html" | "htm" => "text/html",
+        "doc" => "application/msword",
+        "docx" => {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+        "xls" => "application/vnd.ms-excel",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "ppt" => "application/vnd.ms-powerpoint",
+        "pptx" => {
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        }
+        _ => "application/octet-stream",
+    }
+    .to_string()
+}
+
 fn parse_artifact_extra(extra: &Option<String>) -> Result<ArtifactExtra, String> {
     let raw = extra.as_ref().ok_or("artifact node has no extra")?;
     let v: serde_json::Value =
@@ -315,8 +363,11 @@ pub async fn open_message_attachment(
         .map_err(|e| e.to_string())?
         .ok_or("node not found")?;
 
-    if node.node_type != "assistant_message" {
-        return Err(format!("node {} is not an assistant_message", message_node_id));
+    if node.node_type != "assistant_message" && node.node_type != "user_message" {
+        return Err(format!(
+            "node {} has no message attachments (type: {})",
+            message_node_id, node.node_type
+        ));
     }
 
     let attachments = parse_attachments_extra(&node.extra)?;
@@ -364,4 +415,160 @@ pub async fn open_with_os(
 ) -> Result<(), String> {
     let path = materialize(pool, data_dir, node_id).await?;
     open::that(&path).map_err(|e| format!("open failed: {e}"))
+}
+
+// ---------------------------------------------------------------------------
+// Исходящие вложения к запросу пользователя (универсальная отправка файлов LLM).
+// ---------------------------------------------------------------------------
+
+/// Потолок размера одного отправляемого файла. Выше — отклоняем, чтобы не
+/// раздувать base64 через IPC и тело HTTP-запроса к провайдеру.
+pub const MAX_OUTGOING_ATTACHMENT_BYTES: u64 = 20 * 1024 * 1024;
+
+/// Источник исходящего вложения: либо файл с диска (копируем в хранилище),
+/// либо уже хранящийся артефакт/вложение (цитирование принятого медиа —
+/// переиспользуем существующий файл без копии).
+#[derive(Debug, Deserialize)]
+#[serde(tag = "origin", rename_all = "snake_case")]
+pub enum AttachmentSource {
+    /// Файл, выбранный пользователем на диске.
+    Disk { path: String },
+    /// Уже лежащий в хранилище файл (storage_path относительно data_dir).
+    Stored {
+        storage_path: String,
+        filename: String,
+        extension: String,
+        #[serde(default)]
+        mime: Option<String>,
+    },
+}
+
+/// Подготовить вложения к Q-узлу: диск-файлы копируем в `artifacts/`, уже
+/// хранящиеся — переиспользуем как есть. Возвращает метаданные для
+/// `extra.attachments`. Любая ошибка по конкретному файлу прерывает отправку
+/// (в отличие от приёма медиа от LLM — тут пользователь явно прикрепил файл и
+/// должен узнать, что он не ушёл).
+pub fn stage_outgoing_attachments(
+    data_dir: &str,
+    sources: &[AttachmentSource],
+) -> Result<Vec<AttachmentExtra>, String> {
+    if sources.is_empty() {
+        return Ok(vec![]);
+    }
+    let dir = artifacts_dir(data_dir);
+    fs::create_dir_all(&dir).map_err(|e| format!("cannot create artifacts dir: {e}"))?;
+
+    let mut out = Vec::with_capacity(sources.len());
+    for src in sources {
+        match src {
+            AttachmentSource::Disk { path } => {
+                let source = Path::new(path);
+                if !source.is_file() {
+                    return Err(format!("file not found: {path}"));
+                }
+                let size_bytes = fs::metadata(source).map_err(|e| e.to_string())?.len();
+                if size_bytes > MAX_OUTGOING_ATTACHMENT_BYTES {
+                    return Err(format!(
+                        "файл слишком большой ({:.1} МБ), лимит {} МБ",
+                        size_bytes as f64 / (1024.0 * 1024.0),
+                        MAX_OUTGOING_ATTACHMENT_BYTES / (1024 * 1024)
+                    ));
+                }
+                let filename = source
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("file")
+                    .to_string();
+                let extension = extension_from_filename(&filename);
+                let media_kind = infer_media_kind(&extension);
+                let id = uuid::Uuid::new_v4().to_string();
+                let rel_path = format!("artifacts/{}.{}", id, extension);
+                let dest = dir.join(format!("{}.{}", id, extension));
+                fs::copy(source, &dest).map_err(|e| format!("copy failed: {e}"))?;
+                out.push(AttachmentExtra {
+                    media_kind,
+                    mime: Some(mime_from_extension(&extension)),
+                    extension,
+                    filename,
+                    size_bytes,
+                    storage_path: rel_path,
+                });
+            }
+            AttachmentSource::Stored {
+                storage_path,
+                filename,
+                extension,
+                mime,
+            } => {
+                let path = PathBuf::from(data_dir).join(storage_path);
+                if !path.is_file() {
+                    return Err(format!("stored file missing: {storage_path}"));
+                }
+                let size_bytes = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                let ext = extension.trim_start_matches('.').to_ascii_lowercase();
+                out.push(AttachmentExtra {
+                    media_kind: infer_media_kind(&ext),
+                    mime: mime.clone().or_else(|| Some(mime_from_extension(&ext))),
+                    extension: ext,
+                    filename: filename.clone(),
+                    size_bytes,
+                    storage_path: storage_path.clone(),
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Прочитать хранящийся файл вложения в base64 для отправки в LLM.
+#[derive(Debug, Serialize)]
+pub struct AttachmentBytes {
+    pub mime: String,
+    pub extension: String,
+    pub base64: String,
+}
+
+/// Читает файл по относительному `storage_path` и кодирует в base64.
+/// Защита от выхода за пределы хранилища: путь должен указывать внутрь
+/// `data_dir/artifacts/`.
+pub fn read_attachment_base64(
+    data_dir: &str,
+    storage_path: &str,
+    mime: Option<&str>,
+) -> Result<AttachmentBytes, String> {
+    use base64::Engine;
+
+    let base = PathBuf::from(data_dir);
+    let full = base.join(storage_path);
+    let canon_base = fs::canonicalize(artifacts_dir(data_dir))
+        .map_err(|e| format!("cannot resolve storage dir: {e}"))?;
+    let canon_full =
+        fs::canonicalize(&full).map_err(|e| format!("attachment not found: {storage_path} ({e})"))?;
+    if !canon_full.starts_with(&canon_base) {
+        return Err("attachment path escapes storage dir".into());
+    }
+
+    let meta = fs::metadata(&canon_full).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_OUTGOING_ATTACHMENT_BYTES {
+        return Err(format!(
+            "файл слишком большой для отправки ({:.1} МБ)",
+            meta.len() as f64 / (1024.0 * 1024.0)
+        ));
+    }
+
+    let bytes = fs::read(&canon_full).map_err(|e| format!("read failed: {e}"))?;
+    let extension = canon_full
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_else(|| "bin".to_string());
+    let resolved_mime = mime
+        .map(|m| m.to_string())
+        .unwrap_or_else(|| mime_from_extension(&extension));
+
+    Ok(AttachmentBytes {
+        mime: resolved_mime,
+        extension,
+        base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+    })
 }

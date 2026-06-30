@@ -12,9 +12,41 @@
 // трогаем — он уже отделён парсером (код печатается дословно).
 
 import { useState, type ReactNode } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { t } from '../../i18n';
 import { copyToClipboard } from '../../dialog/clipboard';
 import type { Segment, SegmentRenderer } from '../host/types';
+
+// Нормализация адреса: «голый» www.… открываем по https. Остальное — как есть
+// (схему mailto:, http(s):// и пр. опенер ОС разрулит сам).
+function normalizeUrl(url: string): string {
+  return /^www\./i.test(url) ? `https://${url}` : url;
+}
+
+// Гиперссылка в тексте ответа. В Tauri обычный <a href> увёл бы всё окно на
+// страницу — поэтому перехватываем клик и открываем во внешнем браузере ОС.
+// stopPropagation: пузырь сообщения сам ловит клик (выбор для «Метрики»).
+function MsgLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: ReactNode;
+}): React.ReactElement {
+  return (
+    <a
+      className="msg-link"
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        void openUrl(href).catch((err) => console.error('openUrl failed:', err));
+      }}
+    >
+      {children}
+    </a>
+  );
+}
 
 // --- Инлайн-разметка -------------------------------------------------------
 // Однопроходный разбор: на каждом шаге пробуем «спец-токен» в начале остатка,
@@ -48,6 +80,38 @@ function parseInline(text: string): ReactNode[] {
       continue;
     }
 
+    // Markdown-ссылка [текст](url). Текст разбираем рекурсивно (может содержать
+    // эмфазу), url берём как есть (без пробелов и закрывающей скобки).
+    const mdLink = /^\[([^\]\n]+)\]\(([^)\s]+)\)/.exec(rest);
+    if (mdLink) {
+      flush();
+      nodes.push(
+        <MsgLink key={`i${key++}`} href={normalizeUrl(mdLink[2])}>
+          {parseInline(mdLink[1])}
+        </MsgLink>,
+      );
+      i += mdLink[0].length;
+      continue;
+    }
+
+    // «Голый» URL: http(s)://… или www.… Проверяем РАНЬШE эмфазы, иначе * и _
+    // внутри адреса разобьют ссылку. Хвостовую пунктуацию предложения
+    // (.,;:!?…»") в адрес не включаем.
+    const url = /^(https?:\/\/[^\s<]+|www\.[^\s<]+)/i.exec(rest);
+    if (url) {
+      const addr = url[1].replace(/[.,;:!?)\]}'"»]+$/, '');
+      if (addr.length > 0) {
+        flush();
+        nodes.push(
+          <MsgLink key={`i${key++}`} href={normalizeUrl(addr)}>
+            {addr}
+          </MsgLink>,
+        );
+        i += addr.length;
+        continue;
+      }
+    }
+
     const bold = /^\*\*([^\n]+?)\*\*/.exec(rest) ?? /^__([^\n]+?)__/.exec(rest);
     if (bold) {
       flush();
@@ -63,6 +127,59 @@ function parseInline(text: string): ReactNode[] {
       nodes.push(<em key={`i${key++}`}>{parseInline(italic[1])}</em>);
       i += italic[0].length;
       continue;
+    }
+
+    buf += text[i];
+    i += 1;
+  }
+
+  flush();
+  return nodes;
+}
+
+// Автоссылки без markdown: текст остаётся дословным, кликабельными становятся
+// только URL и markdown-ссылки. Для пузырей вопроса пользователя — там не нужна
+// эмфаза/заголовки, но ссылки нажимать удобно.
+export function autolinkPlain(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let buf = '';
+  let key = 0;
+  let i = 0;
+  const flush = () => {
+    if (buf) {
+      nodes.push(buf);
+      buf = '';
+    }
+  };
+
+  while (i < text.length) {
+    const rest = text.slice(i);
+
+    const mdLink = /^\[([^\]\n]+)\]\(([^)\s]+)\)/.exec(rest);
+    if (mdLink) {
+      flush();
+      nodes.push(
+        <MsgLink key={`l${key++}`} href={normalizeUrl(mdLink[2])}>
+          {mdLink[1]}
+        </MsgLink>,
+      );
+      i += mdLink[0].length;
+      continue;
+    }
+
+    const url = /^(https?:\/\/[^\s<]+|www\.[^\s<]+)/i.exec(rest);
+    if (url) {
+      const addr = url[1].replace(/[.,;:!?)\]}'"»]+$/, '');
+      if (addr.length > 0) {
+        flush();
+        nodes.push(
+          <MsgLink key={`l${key++}`} href={normalizeUrl(addr)}>
+            {addr}
+          </MsgLink>,
+        );
+        i += addr.length;
+        continue;
+      }
     }
 
     buf += text[i];

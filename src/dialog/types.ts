@@ -5,9 +5,21 @@
 
 import type { ArtifactData } from "./artifactMedia";
 
+// Ссылка на хранящийся файл вложения для отправки в LLM. Байты НЕ держим в
+// памяти ветки — читаем по storage_path на шаге гидрации перед запросом.
+export interface LlmAttachmentRef {
+  storagePath: string;
+  mime: string | null;
+  extension: string;
+  mediaKind: import("./artifactMedia").MediaKind;
+  filename: string;
+}
+
 export interface LlmMessage {
   role: "user" | "assistant";
   content: string;
+  /** Вложения пользователя к этому сообщению (только у role: 'user'). */
+  attachments?: LlmAttachmentRef[];
 }
 
 export interface Message {
@@ -29,6 +41,31 @@ export interface Message {
 
 export type { ArtifactData } from "./artifactMedia";
 export type { MediaKind } from "./artifactMedia";
+
+// Источник исходящего вложения — соответствует Rust-перечислению
+// artifacts::AttachmentSource (serde tag = "origin"). Поля вложенных объектов
+// идут в snake_case, как ждёт serde на бэкенде.
+export type AttachmentSource =
+  | { origin: "disk"; path: string }
+  | {
+      origin: "stored";
+      storage_path: string;
+      filename: string;
+      extension: string;
+      mime: string | null;
+    };
+
+// Черновик вложения в композере (чип над полем ввода до отправки).
+export interface PendingAttachment {
+  /** Локальный ключ для React/удаления. */
+  id: string;
+  source: AttachmentSource;
+  filename: string;
+  extension: string;
+  mediaKind: import("./artifactMedia").MediaKind;
+  /** Размер в байтах; 0 — неизвестен (свежий файл с диска). */
+  sizeBytes: number;
+}
 
 export interface MarkerData {
   id: string;

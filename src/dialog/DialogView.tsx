@@ -18,7 +18,10 @@ import { t } from "../i18n";
 import type { DialogController } from "./useDialogController";
 import { copyToClipboard } from "./clipboard";
 import { MessageContent } from "../renderers/MessageContent";
+import { autolinkPlain } from "../renderers/base/segments";
 import { ArtifactPlaque } from "./ArtifactPlaque";
+import { MediaKindIcon } from "./MediaKindIcon";
+import { extensionBadge } from "./artifactMedia";
 import { TagsEditor } from "./TagsEditor";
 import { useMetricsEnabled } from "../settings/metricsSetting";
 import { resolveModelName } from "../widgets/llm/registry";
@@ -103,6 +106,10 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     toggleBranching,
     attachArtifactFromDisk,
     attachBusy,
+    pendingAttachments,
+    addPendingFiles,
+    addPendingFromExisting,
+    removePendingAttachment,
     openArtifact,
     openingArtifactId,
     openMessageAttachment,
@@ -544,6 +551,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
                   artifact={m.artifact}
                   busy={openingArtifactId === m.nodeId}
                   onOpen={() => { void openArtifact(m.nodeId); }}
+                  onQuote={() => addPendingFromExisting(m.artifact!)}
                 />
               </div>
             );
@@ -574,10 +582,10 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
               <div className="message-content">
                 {m.role === "assistant"
                   ? <MessageContent content={m.content} facts={facts} />
-                  : <p>{m.content}</p>}
+                  : <p>{autolinkPlain(m.content)}</p>}
               </div>
 
-              {m.role === "assistant" && m.attachments.length > 0 && (
+              {m.attachments.length > 0 && (
                 <div className="message-attachments">
                   {m.attachments.map((att, attIdx) => (
                     <ArtifactPlaque
@@ -585,6 +593,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
                       artifact={att}
                       busy={openingAttachmentKey === `${m.nodeId}:${attIdx}`}
                       onOpen={() => { void openMessageAttachment(m.nodeId, attIdx); }}
+                      onQuote={() => addPendingFromExisting(att)}
                     />
                   ))}
                 </div>
@@ -805,6 +814,28 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
           onMouseDown={startComposerResize}
           title={t("app.composer.resizeHint")}
         />
+        {pendingAttachments.length > 0 && (
+          <div className="composer-attachments">
+            {pendingAttachments.map((att) => (
+              <span key={att.id} className="pending-chip" title={att.filename}>
+                <span className="pending-chip-icon" aria-hidden>
+                  <MediaKindIcon kind={att.mediaKind} />
+                </span>
+                <span className="pending-chip-ext">{extensionBadge(att.extension)}</span>
+                <span className="pending-chip-name">{att.filename}</span>
+                <button
+                  type="button"
+                  className="pending-chip-remove"
+                  title={t("app.attachment.remove")}
+                  aria-label={t("app.attachment.remove")}
+                  onClick={() => removePendingAttachment(att.id)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="composer-main">
           <div className="composer-field">
             {branchingFromId && (
@@ -829,7 +860,10 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
                   ? t("app.composer.altPlaceholder")
                   : t("app.composer.placeholder")
               }
-              disabled={loading || !dialogId || isBlocked}
+              /* Не дизейблим во время loading: поле держит фокус и позволяет
+                 печатать следующий запрос, пока идёт текущий. Повторную отправку
+                 не даст гард loading в sendMessage/sendBranch. */
+              disabled={!dialogId || isBlocked}
             />
           </div>
           <div className="composer-buttons">
@@ -842,6 +876,16 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
                 ✕
               </button>
             )}
+            <button
+              type="button"
+              className="composer-attach"
+              onClick={() => { void addPendingFiles(); }}
+              disabled={loading || !dialogId || isBlocked}
+              title={t("app.composer.attach")}
+              aria-label={t("app.composer.attach")}
+            >
+              <span className="composer-attach-icon" aria-hidden>📎</span>
+            </button>
             <button
               className="composer-send"
               onClick={submitComposer}

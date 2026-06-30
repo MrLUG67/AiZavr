@@ -11,6 +11,9 @@ export interface LlmResponse {
   tokensOutput: number;
   /** Картинки и прочие бинарные части ответа (если модель вернула). */
   media: LlmMediaItem[];
+  /** Нефатальные предупреждения (например, вложение не поддержано моделью и
+   *  было отброшено). Текст ответа при этом сохраняется. */
+  warnings?: string[];
 }
 
 export interface LlmProvider {

@@ -5,6 +5,7 @@ import type { ChatMessage, ModelCapabilities } from '../host/types';
 import type { LlmResponse } from '../llm/types';
 import { extractFromGeminiParts } from '../llm/extractMedia';
 import { capabilitiesFromGemini } from '../llm/capabilities';
+import { modelAcceptsKind, unsupportedWarning } from '../llm/outgoingMedia';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -139,31 +140,53 @@ export async function fetchModels(apiKey: string): Promise<GeminiModel[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Часть запроса Gemini: текст ИЛИ бинарные данные (inlineData).
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
 // Раскладываем диалог ядра в формат Gemini:
 // - system-сообщения собираются в systemInstruction;
-// - user → role "user", assistant → role "model".
-function toGeminiContents(messages: ChatMessage[]): {
+// - user → role "user", assistant → role "model";
+// - вложения (media) → inlineData, с гейтингом по возможностям модели.
+function toGeminiContents(
+  messages: ChatMessage[],
+  cap?: ModelCapabilities,
+): {
   systemInstruction?: { parts: { text: string }[] };
-  contents: { role: string; parts: { text: string }[] }[];
+  contents: { role: string; parts: GeminiPart[] }[];
+  warnings: string[];
 } {
   const systemTexts: string[] = [];
-  const contents: { role: string; parts: { text: string }[] }[] = [];
+  const contents: { role: string; parts: GeminiPart[] }[] = [];
+  const warnings: string[] = [];
 
   for (const m of messages) {
     if (m.role === 'system') {
       if (m.content.trim()) systemTexts.push(m.content);
       continue;
     }
+    const parts: GeminiPart[] = [];
+    if (m.content) parts.push({ text: m.content });
+    for (const part of m.media ?? []) {
+      if (!modelAcceptsKind(cap, part.kind)) {
+        warnings.push(unsupportedWarning(part));
+        continue;
+      }
+      parts.push({ inlineData: { mimeType: part.mime, data: part.base64 } });
+    }
+    if (parts.length === 0) parts.push({ text: m.content });
     contents.push({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+      parts,
     });
   }
 
   const out: {
     systemInstruction?: { parts: { text: string }[] };
-    contents: { role: string; parts: { text: string }[] }[];
-  } = { contents };
+    contents: { role: string; parts: GeminiPart[] }[];
+    warnings: string[];
+  } = { contents, warnings };
 
   if (systemTexts.length > 0) {
     out.systemInstruction = { parts: [{ text: systemTexts.join('\n\n') }] };
@@ -175,8 +198,12 @@ export async function chatCompletion(
   apiKey: string,
   modelId: string,
   messages: ChatMessage[],
+  model?: GeminiModel,
 ): Promise<LlmResponse> {
-  const { systemInstruction, contents } = toGeminiContents(messages);
+  const { systemInstruction, contents, warnings } = toGeminiContents(
+    messages,
+    model?.capabilities,
+  );
   const wantsImage = /image/i.test(modelId);
 
   const generationConfig: Record<string, unknown> = {
@@ -252,5 +279,6 @@ export async function chatCompletion(
     modelId: parsed.modelVersion ?? modelId,
     tokensInput: parsed.usageMetadata?.promptTokenCount ?? 0,
     tokensOutput: parsed.usageMetadata?.candidatesTokenCount ?? 0,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }

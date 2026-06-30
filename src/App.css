@@ -958,6 +958,19 @@ h1 {
   margin: 2px 0;
 }
 
+/* Гиперссылка внутри текста сообщения. Открывается во внешнем браузере (JS),
+   href оставлен для копирования/предпросмотра адреса. Длинные URL переносим. */
+.msg-link {
+  color: #396cd8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  word-break: break-word;
+}
+.msg-link:hover {
+  color: #2752b0;
+}
+
 /* Инлайн-код (`…`) внутри текста ответа: лёгкая подложка + моноширинный шрифт. */
 .inline-code {
   font-family: ui-monospace, "Cascadia Code", "Consolas", "Menlo", monospace;
@@ -1084,9 +1097,16 @@ h1 {
 
 .artifact-plaque {
   display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.artifact-plaque-open {
+  display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid rgba(57, 108, 216, 0.35);
   border-radius: 10px;
@@ -1099,14 +1119,36 @@ h1 {
   transition: background 0.12s, border-color 0.12s;
 }
 
-.artifact-plaque:hover:not(:disabled) {
+.artifact-plaque-open:hover:not(:disabled) {
   background: rgba(57, 108, 216, 0.11);
   border-color: rgba(57, 108, 216, 0.55);
 }
 
-.artifact-plaque:disabled {
+.artifact-plaque-open:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+/* «Цитирование» — стрелка вниз: добавить файл в запрос. */
+.artifact-plaque-quote {
+  flex-shrink: 0;
+  width: 34px;
+  margin-left: 6px;
+  border: 1px solid rgba(57, 108, 216, 0.35);
+  border-radius: 10px;
+  background: rgba(57, 108, 216, 0.06);
+  color: #2f5bb8;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.artifact-plaque-quote:hover {
+  background: rgba(57, 108, 216, 0.14);
+  border-color: rgba(57, 108, 216, 0.6);
 }
 
 .artifact-plaque-icon {
@@ -1405,6 +1447,89 @@ h1 {
 .composer-cancel {
   padding: 0.4em 0.7em;
   font-size: 0.9em;
+}
+.composer-attach {
+  padding: 0.4em 0.7em;
+  font-size: 1.05em;
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Скрепку кладём горизонтально (поворот на 90°) — так читается на кнопке. */
+.composer-attach-icon {
+  display: inline-block;
+  font-size: 2em;
+  transform: rotate(90deg);
+}
+
+/* Чипы приложенных к запросу файлов — над полем ввода. */
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 16px 0;
+  flex-shrink: 0;
+}
+
+.pending-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  padding: 3px 6px 3px 8px;
+  border: 1px solid rgba(57, 108, 216, 0.35);
+  border-radius: 14px;
+  background: rgba(57, 108, 216, 0.08);
+  font-size: 0.8rem;
+}
+
+.pending-chip-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: #2f5bb8;
+}
+.pending-chip-icon .artifact-kind-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.pending-chip-ext {
+  flex-shrink: 0;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #2f5bb8;
+}
+
+.pending-chip-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+.pending-chip-remove {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+.pending-chip-remove:hover {
+  opacity: 1;
+  background: rgba(192, 57, 43, 0.18);
+  color: #c0392b;
 }
 
 /* Справка плагина в центре (D-072): занимает область диалога, кнопка «Закрыть». */
@@ -1898,18 +2023,30 @@ h1 {
     background-color: rgba(255,255,255,0.08);
   }
 
+  .msg-link { color: #79a8ff; }
+  .msg-link:hover { color: #9ec3ff; }
+
   .message-content--compressed {
     background-color: rgba(255,255,255,0.05);
     border-color: rgba(255,255,255,0.25);
   }
 
-  .artifact-plaque {
+  .artifact-plaque-open {
     border-color: rgba(97, 160, 255, 0.35);
     background: rgba(97, 160, 255, 0.08);
     color: #f0f0f0;
   }
-  .artifact-plaque:hover:not(:disabled) {
+  .artifact-plaque-open:hover:not(:disabled) {
     background: rgba(97, 160, 255, 0.14);
+    border-color: rgba(97, 160, 255, 0.5);
+  }
+  .artifact-plaque-quote {
+    border-color: rgba(97, 160, 255, 0.35);
+    background: rgba(97, 160, 255, 0.08);
+    color: #61a0ff;
+  }
+  .artifact-plaque-quote:hover {
+    background: rgba(97, 160, 255, 0.16);
     border-color: rgba(97, 160, 255, 0.5);
   }
   .artifact-plaque-icon {
@@ -1921,6 +2058,13 @@ h1 {
     color: #61a0ff;
     background: rgba(97, 160, 255, 0.15);
   }
+  .pending-chip {
+    border-color: rgba(97, 160, 255, 0.35);
+    background: rgba(97, 160, 255, 0.1);
+    color: #f0f0f0;
+  }
+  .pending-chip-icon,
+  .pending-chip-ext { color: #61a0ff; }
   .dialog-attach-btn {
     border-color: rgba(255,255,255,0.2);
     color: #f0f0f0;

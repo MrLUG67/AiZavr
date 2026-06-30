@@ -22,7 +22,9 @@ export type CapabilityName =
   | 'config'
   | 'ui.focus'
   | 'tags.read'
-  | 'tags.write';
+  | 'tags.write'
+  | 'export.read'
+  | 'export.save';
 
 export interface WidgetManifest {
   // идентичность
@@ -155,9 +157,25 @@ export interface ReachableEnd {
   label: string;
 }
 
+// Бинарная часть запроса к LLM (картинка/аудио/видео/документ), приложенная
+// пользователем. Текстовые файлы сюда НЕ попадают — их содержимое инлайнится
+// прямо в content на этапе гидрации.
+export interface ChatMediaPart {
+  /** image | audio | video | document | other — для гейтинга по модели. */
+  kind: 'image' | 'audio' | 'video' | 'document' | 'other';
+  mime: string;
+  /** Base64 без префикса data:… */
+  base64: string;
+  /** Имя исходного файла (для провайдеров, что требуют filename, напр. PDF). */
+  filename: string;
+  extension: string;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** Приложенные пользователем бинарные файлы (только у role: 'user'). */
+  media?: ChatMediaPart[];
 }
 
 export interface CompressionProvenance {
@@ -165,6 +183,58 @@ export interface CompressionProvenance {
   pluginVersion: string;
   algorithm: string;
   params: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Экспорт диалога (capability `export`). В отличие от NodeView (узкая проекция
+// для маркеров) экспортный узел НЕСЁТ происхождение (model/plugin) и вложения —
+// чтобы плагин «Сохранить диалог» мог встроить картинки и подпись модели.
+// ---------------------------------------------------------------------------
+
+export interface ExportAttachment {
+  mediaKind: 'image' | 'audio' | 'video' | 'model_3d' | 'document' | 'other';
+  filename: string;
+  extension: string;
+  mime: string | null;
+  /** Относительный путь в хранилище ядра; ключ для loadImageBase64. */
+  storagePath: string;
+}
+
+export interface ExportNode {
+  id: string;
+  nodeType: NodeView['nodeType'];
+  content: string;
+  /** Модель, сгенерировавшая узел (у ответов). */
+  modelId: string | null;
+  /** LLM-плагин, сгенерировавший узел (у ответов). */
+  pluginId: string | null;
+  /** Бинарные вложения сообщения (картинки/файлы внутри Q/A). */
+  attachments: ExportAttachment[];
+  /** Метаданные, если сам узел — artifact-узел (отдельный файл в ветке). */
+  artifact: ExportAttachment | null;
+}
+
+export interface ExportImage {
+  mime: string;
+  /** Base64 без префикса data:… */
+  base64: string;
+}
+
+export interface SaveFileArgs {
+  /** Имя по умолчанию в диалоге сохранения (с расширением). */
+  defaultName: string;
+  /** Расширение без точки: 'txt' | 'html' | 'doc'. */
+  extension: string;
+  /** Готовый текст документа. */
+  contents: string;
+}
+
+export interface SaveBinaryFileArgs {
+  defaultName: string;
+  /** Расширение без точки, напр. 'pdf'. */
+  extension: string;
+  /** Содержимое в base64 (без префикса data:…). */
+  base64: string;
 }
 
 export interface WidgetCapabilities {
@@ -222,6 +292,19 @@ export interface WidgetCapabilities {
     openForm(doc: FormDoc): void;
     refreshForm(doc: FormDoc): void;
     closeForm(): void;
+  };
+  // экспорт диалога: «богатый» диапазон (с моделью/плагином/вложениями),
+  // чтение картинок в base64 и запись готового документа в выбранный файл.
+  // resolveRichRange использует ту же cmd_resolve_linear_range, но НЕ обедняет
+  // узлы до NodeView (сохраняет происхождение и вложения). saveFile открывает
+  // системный диалог сохранения и пишет файл через ядро (КЛЮЧ к ФС в ядре).
+  export: {
+    resolveRichRange(start: string, end: string): Promise<ExportNode[]>;
+    loadImageBase64(storagePath: string, mime: string | null): Promise<ExportImage>;
+    /** false — пользователь отменил выбор файла; true — файл записан. */
+    saveFile(args: SaveFileArgs): Promise<boolean>;
+    /** Запись бинарного документа (PDF) из base64. false — отмена. */
+    saveBinaryFile(args: SaveBinaryFileArgs): Promise<boolean>;
   };
   // теги диалога: чтение/запись для автоматизации плагинами.
   tags: {

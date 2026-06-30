@@ -1,8 +1,14 @@
 // HTTP-клиент OpenRouter — живёт в плагине, не в ядре.
-import type { ChatMessage } from '../host/types';
+import type { ChatMessage, ChatMediaPart } from '../host/types';
 import type { LlmResponse } from '../llm/types';
 import { extractFromOpenAiContent } from '../llm/extractMedia';
 import { capabilitiesFromOpenRouter } from '../llm/capabilities';
+import {
+  modelAcceptsKind,
+  unsupportedWarning,
+  toDataUrl,
+  audioFormat,
+} from '../llm/outgoingMedia';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -134,6 +140,55 @@ export async function fetchModels(apiKey: string): Promise<OpenRouterModel[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Преобразовать одну часть-вложение в элемент content[] OpenAI-формата.
+function mediaToOpenAiPart(part: ChatMediaPart): Record<string, unknown> {
+  if (part.kind === 'image') {
+    return { type: 'image_url', image_url: { url: toDataUrl(part) } };
+  }
+  if (part.kind === 'audio') {
+    return {
+      type: 'input_audio',
+      input_audio: { data: part.base64, format: audioFormat(part) },
+    };
+  }
+  // document / video / прочее — как файл (OpenRouter передаёт file_data моделям
+  // с файловым вводом).
+  return {
+    type: 'file',
+    file: { filename: part.filename, file_data: toDataUrl(part) },
+  };
+}
+
+// Собрать messages для OpenRouter: сообщения с media превращаем в content[]
+// (text + части), гейтим по возможностям модели, копим предупреждения.
+function buildMessages(
+  messages: ChatMessage[],
+  model?: OpenRouterModel,
+): { messages: unknown[]; warnings: string[] } {
+  const warnings: string[] = [];
+  const out = messages.map((m) => {
+    if (!m.media?.length) {
+      return { role: m.role, content: m.content };
+    }
+    const parts: Record<string, unknown>[] = [];
+    if (m.content) parts.push({ type: 'text', text: m.content });
+    for (const part of m.media) {
+      if (!modelAcceptsKind(model?.capabilities, part.kind)) {
+        warnings.push(unsupportedWarning(part));
+        continue;
+      }
+      parts.push(mediaToOpenAiPart(part));
+    }
+    // Все вложения отброшены — отправляем обычный текст.
+    if (parts.length === 0) return { role: m.role, content: m.content };
+    if (parts.length === 1 && (parts[0] as { type?: string }).type === 'text') {
+      return { role: m.role, content: m.content };
+    }
+    return { role: m.role, content: parts };
+  });
+  return { messages: out, warnings };
+}
+
 export async function chatCompletion(
   apiKey: string,
   modelId: string,
@@ -144,9 +199,11 @@ export async function chatCompletion(
     model?.outputModalities?.includes('image') ??
     /image/i.test(modelId);
 
+  const { messages: builtMessages, warnings } = buildMessages(messages, model);
+
   const bodyPayload: Record<string, unknown> = {
     model: modelId,
-    messages,
+    messages: builtMessages,
     max_tokens: MAX_OUTPUT_TOKENS,
   };
   if (wantsImage) {
@@ -214,5 +271,6 @@ export async function chatCompletion(
     modelId: parsed.model ?? modelId,
     tokensInput: parsed.usage?.prompt_tokens ?? 0,
     tokensOutput: parsed.usage?.completion_tokens ?? 0,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }

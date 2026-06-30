@@ -9,6 +9,7 @@
 // Структуры Marker / ReachableEnd / DbNode сверены с db/mod.rs и markers/mod.rs.
 
 import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import type {
   WidgetCapabilities,
   Marker,
@@ -20,9 +21,15 @@ import type {
   PreviewDoc,
   PreviewHandlers,
   FormDoc,
+  ExportNode,
+  ExportAttachment,
+  ExportImage,
+  SaveFileArgs,
+  SaveBinaryFileArgs,
 } from './types';
 import { callCompression } from '../llm/compressionRegistry';
 import { callTagging } from '../llm/taggingRegistry';
+import { parseMessageAttachments, parseArtifactExtra } from '../../dialog/artifactMedia';
 
 // ---------------------------------------------------------------------------
 // Сырые формы из Rust (snake_case)
@@ -85,6 +92,66 @@ function dbNodeToView(r: RawDbNode): NodeView {
     text: r.content,
     markers: [], // resolveLinearRange отдаёт текст диапазона; метки тут не нужны
   };
+}
+
+// Полная форма DbNode для экспорта (в отличие от обеднённого NodeView): нужны
+// происхождение (model/plugin) и extra с вложениями. Поля сверены с db/mod.rs.
+interface RawExportNode {
+  id: string;
+  parent_id: string | null;
+  node_type: NodeView['nodeType'];
+  content: string;
+  model_id: string | null;
+  plugin_id: string | null;
+  extra: string | null;
+}
+
+// AttachmentData (dialog/artifactMedia) -> ExportAttachment (контракт плагина).
+// Формы совпадают по смыслу; перекладываем явно, чтобы плагин не зависел от
+// app-типа ArtifactData.
+function toExportAttachment(a: {
+  mediaKind: ExportAttachment['mediaKind'];
+  filename: string;
+  extension: string;
+  mime: string | null;
+  storagePath: string;
+}): ExportAttachment {
+  return {
+    mediaKind: a.mediaKind,
+    filename: a.filename,
+    extension: a.extension,
+    mime: a.mime,
+    storagePath: a.storagePath,
+  };
+}
+
+function dbNodeToExport(r: RawExportNode): ExportNode {
+  const isMessage =
+    r.node_type === 'assistant_message' || r.node_type === 'user_message';
+  return {
+    id: r.id,
+    nodeType: r.node_type,
+    content: r.content,
+    modelId: r.model_id,
+    pluginId: r.plugin_id,
+    attachments: isMessage
+      ? parseMessageAttachments(r.extra).map(toExportAttachment)
+      : [],
+    artifact:
+      r.node_type === 'artifact'
+        ? (() => {
+            const a = parseArtifactExtra(r.extra);
+            return a ? toExportAttachment(a) : null;
+          })()
+        : null,
+  };
+}
+
+// AttachmentBytes из Rust (cmd_read_attachment_base64).
+interface RawAttachmentBytes {
+  mime: string;
+  extension: string;
+  base64: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +317,60 @@ export function makeCapabilities(
         deps.onCloseForm();
       },
     },
+    // -- export: «богатый» диапазон + чтение картинок + запись файла ---------
+    export: {
+      async resolveRichRange(start: string, end: string): Promise<ExportNode[]> {
+        const raw = await invoke<RawExportNode[]>('cmd_resolve_linear_range', {
+          startNodeId: start,
+          endNodeId: end,
+        });
+        return raw.map(dbNodeToExport);
+      },
+
+      async loadImageBase64(
+        storagePath: string,
+        mime: string | null,
+      ): Promise<ExportImage> {
+        const bytes = await invoke<RawAttachmentBytes>('cmd_read_attachment_base64', {
+          storagePath,
+          mime,
+        });
+        return { mime: bytes.mime, base64: bytes.base64 };
+      },
+
+      async saveFile(args: SaveFileArgs): Promise<boolean> {
+        // Системный диалог сохранения (plugin-dialog). Запись делает ядро
+        // (cmd_write_export_file) — у плагина нет прямого доступа к ФС.
+        const path = await save({
+          defaultPath: args.defaultName,
+          filters: [
+            { name: args.extension.toUpperCase(), extensions: [args.extension] },
+          ],
+        });
+        if (!path) return false;
+        await invoke<void>('cmd_write_export_file', {
+          path,
+          contents: args.contents,
+        });
+        return true;
+      },
+
+      async saveBinaryFile(args: SaveBinaryFileArgs): Promise<boolean> {
+        const path = await save({
+          defaultPath: args.defaultName,
+          filters: [
+            { name: args.extension.toUpperCase(), extensions: [args.extension] },
+          ],
+        });
+        if (!path) return false;
+        await invoke<void>('cmd_write_export_file_base64', {
+          path,
+          base64Data: args.base64,
+        });
+        return true;
+      },
+    },
+
     tags: {
       // Контракт плагинов остаётся строковым (display-имена тегов); под капотом —
       // справочник tags (миграция 009), маппим объекты к именам.

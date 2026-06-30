@@ -18,7 +18,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, FormDoc } from "../widgets/host/types";
-import { parseArtifactExtra, parseMessageAttachments } from "./artifactMedia";
+import { parseArtifactExtra, parseMessageAttachments, inferMediaKind } from "./artifactMedia";
+import { hydrateLlmMessages } from "./hydrateLlmMessages";
 import type { CapabilityDeps } from "../widgets/host/capabilities";
 import {
   getActiveLlmProvider,
@@ -38,10 +39,14 @@ import type {
   SendResult,
   BranchCard,
   Tag,
+  PendingAttachment,
+  AttachmentSource,
+  ArtifactData,
 } from "./types";
 import { buildLlmMessages } from "./buildLlmMessages";
 import { dispatchWidgetMsg } from "../widgets/host/widgetDispatch";
 import { useDialogScroll, type DialogScrollHandle } from "./useDialogScroll";
+import { useShowUnanswered } from "../settings/showUnansweredSetting";
 
 // Полная выдача контроллера. DialogView получает её одним пропсом и читает нужное
 // — так вся разметка/дизайн живёт в DialogView, а контроллер не приходится
@@ -131,6 +136,9 @@ export function useDialogController() {
   const [openingAttachmentKey, setOpeningAttachmentKey] = useState<string | null>(null);
   const [attachBusy, setAttachBusy] = useState(false);
 
+  // Черновик вложений к запросу (чипы над полем ввода). Очищается после отправки.
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+
   // ---------------------------------------------------------------------------
   // Скролл/DOM-слой за императивным handle. Контроллер отдаёт ему ДАННЫЕ и
   // получает обратно ровно один факт (граница просмотра) + операции скролла.
@@ -138,9 +146,20 @@ export function useDialogController() {
   // обязан остаться стабильным (onFocus в capabilityDeps) или вызывается из
   // подписки (клавиатура), чтобы не тащить handle в зависимости.
   // ---------------------------------------------------------------------------
+  // Опция «Показывать без ответа» (меню Настройки). OFF (дефолт): пустые пары
+  // Q+«ответ не получен» скрываются из ленты, как только в ветке появился первый
+  // реальный ответ. ON: показываем всё (диагностика плагина/модели). Фильтрация
+  // ТОЛЬКО визуальная — путь в LLM берёт ветку из БД (cmd_get_branch) и от ленты
+  // не зависит, поэтому модель видит ровно то же, что и раньше.
+  const showUnanswered = useShowUnanswered();
+  const visibleMessages = useMemo(
+    () => (showUnanswered ? messages : hideAnsweredOutPlaceholders(messages)),
+    [messages, showUnanswered],
+  );
+
   const scrollRef = useRef<DialogScrollHandle | null>(null);
   const scroll = useDialogScroll({
-    messages,
+    messages: visibleMessages,
     loading,
     sendError,
     forkMode,
@@ -473,7 +492,7 @@ export function useDialogController() {
           markers,
           artifact: n.node_type === "artifact" ? parseArtifactExtra(n.extra) : null,
           attachments:
-            n.node_type === "assistant_message"
+            n.node_type === "assistant_message" || n.node_type === "user_message"
               ? parseMessageAttachments(n.extra)
               : [],
           modelId: n.model_id,
@@ -703,19 +722,34 @@ export function useDialogController() {
   // ---------------------------------------------------------------------------
 
   async function sendMessage() {
-    if (!input.trim() || loading || !dialogId) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || loading || !dialogId)
+      return;
     const userText = input.trim();
+    const sources = pendingAttachments.map((a) => a.source);
     setInput("");
+    clearPendingAttachments();
     setLoading(true);
-    await doSend(dialogId, lastNodeId, userText);
+    await doSend(dialogId, lastNodeId, userText, sources);
     setLoading(false);
   }
 
   // Единая отправка из нижнего поля: в режиме ветвления уходит альтернативный
-  // запрос, иначе обычный.
+  // запрос, иначе обычный. После отправки возвращаем фокус в поле ввода —
+  // и при Enter, и при клике по «Отправить» (клик уводит фокус на кнопку),
+  // чтобы сразу печатать следующий запрос без мышки. setTimeout — чтобы фокус
+  // ставился после ре-рендера с очищенным input (курсор в пустом поле).
   function submitComposer() {
     if (branchingFromId) sendBranch();
     else sendMessage();
+    setTimeout(() => scroll.composerRef.current?.focus(), 0);
+  }
+
+  // Текст ответа сохранён, но часть вложений/картинок не прошла — показываем
+  // нефатальные предупреждения в той же плашке, что и ошибки отправки.
+  function surfaceWarnings(warnings?: string[]) {
+    if (warnings && warnings.length > 0) {
+      setSendError(warnings.join("\n"));
+    }
   }
 
   // Войти в режим альтернативного запроса для A-узла: общее нижнее поле
@@ -836,6 +870,79 @@ export function useDialogController() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Вложения к запросу (универсальная отправка файлов LLM)
+  // ---------------------------------------------------------------------------
+
+  function makePendingId(): string {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      return `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }
+
+  // Выбрать файлы с диска и добавить чипами к запросу (без копии — копия
+  // произойдёт на бэкенде при отправке).
+  async function addPendingFiles() {
+    if (loading || isBlocked) return;
+    try {
+      const selected = await open({ multiple: true, directory: false });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      const next: PendingAttachment[] = paths.map((path) => {
+        const filename = path.split(/[\\/]/).pop() || "file";
+        const dot = filename.lastIndexOf(".");
+        const extension =
+          dot > 0 ? filename.slice(dot + 1).toLowerCase() : "bin";
+        return {
+          id: makePendingId(),
+          source: { origin: "disk", path },
+          filename,
+          extension,
+          mediaKind: inferMediaKind(extension),
+          sizeBytes: 0,
+        };
+      });
+      setPendingAttachments((prev) => [...prev, ...next]);
+      setTimeout(() => scroll.composerRef.current?.focus(), 0);
+    } catch (e) {
+      console.error("addPendingFiles failed:", e);
+    }
+  }
+
+  // «Цитирование» принятого медиа: добавить уже хранящийся файл к запросу как
+  // ссылку (без копии). att.storagePath указывает внутрь хранилища.
+  function addPendingFromExisting(att: ArtifactData) {
+    if (!att.storagePath) return;
+    setPendingAttachments((prev) => [
+      ...prev,
+      {
+        id: makePendingId(),
+        source: {
+          origin: "stored",
+          storage_path: att.storagePath,
+          filename: att.filename,
+          extension: att.extension,
+          mime: att.mime,
+        },
+        filename: att.filename,
+        extension: att.extension,
+        mediaKind: att.mediaKind,
+        sizeBytes: att.sizeBytes,
+      },
+    ]);
+    setTimeout(() => scroll.composerRef.current?.focus(), 0);
+  }
+
+  function removePendingAttachment(id: string) {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  function clearPendingAttachments() {
+    setPendingAttachments([]);
+  }
+
   async function openMessageAttachment(messageNodeId: string, index: number) {
     const key = `${messageNodeId}:${index}`;
     if (openingAttachmentKey) return;
@@ -871,7 +978,7 @@ export function useDialogController() {
   async function resolveAnswerResilient(
     placeholderId: string,
     pluginId: string,
-    response: { content: string; modelId: string; tokensInput: number; tokensOutput: number; media?: { mime: string; extension: string; base64: string }[] },
+    response: { content: string; modelId: string; tokensInput: number; tokensOutput: number; media?: { mime: string; extension: string; base64: string }[]; warnings?: string[] },
   ): Promise<void> {
     const hasMedia = !!response.media?.length;
     if (hasMedia) {
@@ -894,6 +1001,7 @@ export function useDialogController() {
         media: hasMedia ? response.media : null,
       });
       setSendError(null);
+      surfaceWarnings(response.warnings);
     } catch (e) {
       if (!hasMedia) throw e;
       console.error("resolve_answer with media failed, retrying text-only:", e);
@@ -905,10 +1013,13 @@ export function useDialogController() {
   }
 
   async function sendBranch() {
-    if (!input.trim() || loading || !dialogId || !branchingFromId) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || loading || !dialogId || !branchingFromId)
+      return;
     const userText = input.trim();
     const parentId = branchingFromId;
+    const sources = pendingAttachments.map((a) => a.source);
     setInput("");
+    clearPendingAttachments();
     setBranchingFromId(null);
     setLoading(true);
 
@@ -919,6 +1030,7 @@ export function useDialogController() {
         dialogId,
         parentId,
         content: userText,
+        attachments: sources.length > 0 ? sources : null,
       });
 
       // Показываем новое состояние сразу (Q + плашка), как при обычной отправке.
@@ -930,7 +1042,8 @@ export function useDialogController() {
       if (!provider?.isReady()) {
         throw new Error(t("app.error.llmNotConfigured"));
       }
-      const response = await provider.generateResponse(llmMessages, "main_dialog");
+      const chatMessages = await hydrateLlmMessages(llmMessages);
+      const response = await provider.generateResponse(chatMessages, "main_dialog");
 
       await resolveAnswerResilient(sent.placeholder_id, provider.pluginId, response);
       await loadBranch(dialogId);
@@ -945,7 +1058,12 @@ export function useDialogController() {
     }
   }
 
-  async function doSend(dId: string, parentId: string | null, userText: string) {
+  async function doSend(
+    dId: string,
+    parentId: string | null,
+    userText: string,
+    sources: AttachmentSource[] = [],
+  ) {
     // Устойчивый поток (D-0xx): Q + unanswered_placeholder создаются атомарно
     // ДО обращения к LLM. Если приложение упадёт / ответ не придёт — структура
     // уже регулярна, холостой Q закрыт заглушкой.
@@ -955,9 +1073,12 @@ export function useDialogController() {
         dialogId: dId,
         parentId,
         content: userText,
+        attachments: sources.length > 0 ? sources : null,
       });
     } catch (e) {
+      // Вложение не нашлось/слишком большое — узлы не созданы. Покажем причину.
       console.error("send_user_message failed:", e);
+      setSendError(e instanceof Error ? e.message : String(e));
       return;
     }
 
@@ -971,7 +1092,8 @@ export function useDialogController() {
       if (!provider?.isReady()) {
         throw new Error(t("app.error.llmNotConfigured"));
       }
-      const response = await provider.generateResponse(llmMessages, "main_dialog");
+      const chatMessages = await hydrateLlmMessages(llmMessages);
+      const response = await provider.generateResponse(chatMessages, "main_dialog");
 
       await resolveAnswerResilient(sent.placeholder_id, provider.pluginId, response);
       await loadBranch(dId);
@@ -1042,8 +1164,9 @@ export function useDialogController() {
     notebooks,
     dialogs,
     dialogId,
-    // лента и ввод
-    messages,
+    // лента и ввод (visibleMessages — отфильтрованная по «Показывать без ответа»;
+    // тот же массив видит скролл-слой, поэтому рефы/индексы согласованы).
+    messages: visibleMessages,
     input,
     setInput,
     loading,
@@ -1135,6 +1258,11 @@ export function useDialogController() {
     toggleBranching,
     attachArtifactFromDisk,
     attachBusy,
+    // вложения к запросу (универсальная отправка файлов)
+    pendingAttachments,
+    addPendingFiles,
+    addPendingFromExisting,
+    removePendingAttachment,
     openArtifact,
     openingArtifactId,
     openMessageAttachment,
@@ -1150,4 +1278,31 @@ export function useDialogController() {
       onSelect: (id: string) => { setActiveLlmProvider(id); },
     },
   };
+}
+
+// Фильтр ленты для режима «Показывать без ответа = OFF».
+// Скрывает пустые пары Q + unanswered_placeholder, НИЖЕ которых по ветке уже
+// есть реальный ответ (assistant_message). Незавершённый хвост (заглушки без
+// ответа после них — текущая ожидающая/последняя сбойная попытка) остаётся
+// видимым: пользователь видит «ответ не получен», пока не придёт первый ответ.
+// Если ответов в ветке нет вовсе — не прячем ничего.
+function hideAnsweredOutPlaceholders(messages: Message[]): Message[] {
+  let lastAnswerIdx = -1;
+  messages.forEach((m, i) => {
+    if (m.nodeType === "assistant_message") lastAnswerIdx = i;
+  });
+  if (lastAnswerIdx < 0) return messages;
+
+  const hidden = new Set<number>();
+  messages.forEach((m, i) => {
+    if (m.nodeType === "unanswered_placeholder" && i < lastAnswerIdx) {
+      hidden.add(i);
+      // Q этой пары — непосредственно предшествующий user_message (в линейной
+      // ветке заглушка-ответ всегда ребёнок своего вопроса).
+      const prev = messages[i - 1];
+      if (prev && prev.nodeType === "user_message") hidden.add(i - 1);
+    }
+  });
+  if (hidden.size === 0) return messages;
+  return messages.filter((_, i) => !hidden.has(i));
 }

@@ -3,7 +3,19 @@
 // эффектов — вынесена из App.tsx (шаг 1). Логика срезки заглушек и склейки
 // ролей сохранена дословно.
 
-import type { DbNode, LlmMessage } from "./types";
+import type { DbNode, LlmMessage, LlmAttachmentRef } from "./types";
+import { parseMessageAttachments } from "./artifactMedia";
+
+// Вложения пользователя из extra.attachments узла → ссылки для гидрации.
+function userAttachments(node: DbNode): LlmAttachmentRef[] {
+  return parseMessageAttachments(node.extra).map((a) => ({
+    storagePath: a.storagePath,
+    mime: a.mime,
+    extension: a.extension,
+    mediaKind: a.mediaKind,
+    filename: a.filename,
+  }));
+}
 
 // Превращает линейную ветку узлов в сообщения для LLM.
 // Правило: unanswered_placeholder — служебная заглушка-ответ.
@@ -42,7 +54,12 @@ export function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
       return;
     }
     if (n.node_type === "user_message") {
-      out.push({ role: "user", content: n.content });
+      const attachments = userAttachments(n);
+      out.push({
+        role: "user",
+        content: n.content,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      });
     } else if (n.node_type === "assistant_message") {
       out.push({ role: "assistant", content: n.content });
     }
@@ -57,6 +74,9 @@ export function buildLlmMessages(nodes: DbNode[]): LlmMessage[] {
     const last = merged[merged.length - 1];
     if (last && last.role === m.role) {
       last.content += `\n\n${m.content}`;
+      if (m.attachments?.length) {
+        last.attachments = [...(last.attachments ?? []), ...m.attachments];
+      }
     } else {
       merged.push({ ...m });
     }
