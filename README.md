@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/AiZavr01_sn.png" alt="AiZavr" width="820">
+  <img src="docs/assets/AiZavr01_sn.png" alt="AiZavr" width="240">
 </p>
 
 # AiZavr
