@@ -87,6 +87,10 @@ pub struct DbNode {
     pub children_count: i64,             // полный счётчик, включая удалённые
     // --- добавлено миграцией 004 ---
     pub is_deleted: bool,                // D-048: мягкое удаление
+    // --- добавлено миграцией 010 ---
+    // Владелец узла «на будущее» (облачная синхронизация нескольких аккаунтов).
+    // Локально не используется, всегда NULL (одна личность = одна база).
+    pub user_id: Option<String>,
 }
 
 /// Результат отправки пользовательского сообщения.
@@ -721,7 +725,7 @@ pub async fn get_node(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, plugin_id, tokens_count, is_pinned, is_protected,
                 compression_level, extra, created_at,
-                branch_name, last_visited_leaf_id, children_count, is_deleted
+                branch_name, last_visited_leaf_id, children_count, is_deleted, user_id
          FROM nodes WHERE id = ?"
     )
     .bind(id)
@@ -740,7 +744,7 @@ pub async fn get_children(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, plugin_id, tokens_count, is_pinned, is_protected,
                 compression_level, extra, created_at,
-                branch_name, last_visited_leaf_id, children_count, is_deleted
+                branch_name, last_visited_leaf_id, children_count, is_deleted, user_id
          FROM nodes WHERE parent_id = ? AND is_deleted = 0 ORDER BY created_at ASC"
     )
     .bind(parent_id)
@@ -759,7 +763,7 @@ pub async fn get_deleted_children(
         "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
                 model_id, model_role, plugin_id, tokens_count, is_pinned, is_protected,
                 compression_level, extra, created_at,
-                branch_name, last_visited_leaf_id, children_count, is_deleted
+                branch_name, last_visited_leaf_id, children_count, is_deleted, user_id
          FROM nodes WHERE parent_id = ? AND is_deleted = 1 ORDER BY created_at ASC"
     )
     .bind(parent_id)
@@ -925,6 +929,7 @@ fn node_from_row(r: sqlx::sqlite::SqliteRow) -> DbNode {
         last_visited_leaf_id: r.get("last_visited_leaf_id"),
         children_count: r.get("children_count"),
         is_deleted: r.get::<i64, _>("is_deleted") != 0,
+        user_id: r.get("user_id"),
     }
 }
 

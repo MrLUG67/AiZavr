@@ -121,6 +121,8 @@ export interface DbNode {
   last_visited_leaf_id: string | null;
   is_deleted: boolean;
   extra: string | null;
+  // Заготовка «на будущее» (облачная синхронизация аккаунтов); локально null.
+  user_id: string | null;
 }
 
 export interface Notebook {

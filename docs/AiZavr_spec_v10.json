@@ -592,9 +592,9 @@
       {
         "id": "D-042",
         "area": "business",
-        "statement": "AiZavr — open-source проект. Лицензия Apache 2.0. Хостинг на GitHub.",
+        "statement": "AiZavr — open-source проект. Лицензия GNU Affero GPL v3.0 (AGPL-3.0-only). Хостинг на GitHub.",
         "status": "DECIDED",
-        "rationale": "Мотивация — самореализация. Apache 2.0 оставляет дверь для open-core монетизации."
+        "rationale": "Мотивация — самореализация. Copyleft AGPL держит производные (в т.ч. сетевые сервисы) открытыми; open-core монетизация возможна через двойное лицензирование правообладателем. РЕВИЗИЯ: ранее рассматривалась пермиссивная лицензия, итоговый выбор — AGPL-3.0-only."
       },
       {
         "id": "D-043",
@@ -1180,9 +1180,9 @@
       {
         "id": "Q-025",
         "area": "business",
-        "question": "MIT или Apache 2.0?",
+        "question": "Какую лицензию выбрать?",
         "priority": "CLOSED",
-        "context": "Закрыт: Apache 2.0 выбран (D-042)."
+        "context": "Закрыт: AGPL-3.0-only выбрана (D-042). Ранее рассматривались пермиссивные варианты."
       },
       {
         "id": "Q-026",

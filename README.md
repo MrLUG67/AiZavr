@@ -150,7 +150,7 @@ The project is under active early development. Done: branching dialogue tree, ma
 
 - Author: **Yurii** ([@MrLUG67](https://github.com/MrLUG67))
 - Repository: [github.com/MrLUG67/AiZavr](https://github.com/MrLUG67/AiZavr)
-- License: open source (intended **MIT** / **Apache-2.0**).
+- License: **GNU Affero General Public License v3.0** (AGPL-3.0-only). See [LICENSE](LICENSE).
 
 ---
 
@@ -293,4 +293,4 @@ AiZavr/
 
 - Автор: **Юрий** ([@MrLUG67](https://github.com/MrLUG67))
 - Репозиторий: [github.com/MrLUG67/AiZavr](https://github.com/MrLUG67/AiZavr)
-- Лицензия: открытый исходный код (предполагается **MIT** / **Apache-2.0**).
+- Лицензия: **GNU Affero General Public License v3.0** (AGPL-3.0-only). См. [LICENSE](LICENSE).
