@@ -773,6 +773,28 @@ pub async fn get_deleted_children(
     Ok(rows.into_iter().map(node_from_row).collect())
 }
 
+/// ВСЕ узлы диалога — включая удалённые (is_deleted = 1) и служебные анкоры.
+/// Единственный источник полной топологии для визуализатора «Дерево»: связи
+/// строятся по parent_id, активный путь — по active_child_id. Порядок по времени
+/// создания задаёт стабильную сортировку сестёр (как get_children).
+pub async fn get_all_nodes(
+    pool: &SqlitePool,
+    dialog_id: &str,
+) -> Result<Vec<DbNode>, sqlx::Error> {
+    let rows = sqlx::query(
+        "SELECT id, parent_id, dialog_id, node_type, content, active_child_id,
+                model_id, model_role, plugin_id, tokens_count, is_pinned, is_protected,
+                compression_level, extra, created_at,
+                branch_name, last_visited_leaf_id, children_count, is_deleted, user_id
+         FROM nodes WHERE dialog_id = ? ORDER BY created_at ASC"
+    )
+    .bind(dialog_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(node_from_row).collect())
+}
+
 /// Мягкое удаление ветки: помечает узел и всё его поддерево как is_deleted = 1.
 /// Безопасно — в дереве нет сходящихся веток, поддерево изолировано (D-048).
 /// Если node_id — активная ветка диалога, вызывающий код должен

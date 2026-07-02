@@ -17,7 +17,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, FormDoc } from "../widgets/host/types";
+import type { WidgetFacts, NodeView, ModelFacts, HelpDoc, PreviewDoc, PreviewHandlers, FormDoc, TreeDoc } from "../widgets/host/types";
 import { parseArtifactExtra, parseMessageAttachments, inferMediaKind } from "./artifactMedia";
 import { hydrateLlmMessages } from "./hydrateLlmMessages";
 import type { CapabilityDeps } from "../widgets/host/capabilities";
@@ -28,7 +28,7 @@ import {
   setActiveLlmProvider,
   subscribeLlmProvider,
 } from "../widgets/llm/registry";
-import { t } from "../i18n";
+import { t, useLang } from "../i18n";
 import type {
   Message,
   MarkerData,
@@ -132,6 +132,16 @@ export function useDialogController() {
   const previewHandlersRef = useRef<PreviewHandlers | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [formDoc, setFormDoc] = useState<FormDoc | null>(null);
+  // Визуализатор всего дерева беседы в центре (плагин «Дерево»). null — скрыт.
+  const [treeDoc, setTreeDoc] = useState<TreeDoc | null>(null);
+  // Живая смена языка для ОТКРЫТОЙ формы плагина: формы — снимок данных (FormDoc),
+  // view() их не пересобирает. При смене языка просим плагин-владельца открытой
+  // формы пересобрать её из текущего state с новыми t()-строками (@@lang).
+  const lang = useLang();
+  useEffect(() => {
+    if (formDoc) dispatchWidgetMsg(formDoc.widgetId, { type: "@@lang" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
   const [openingArtifactId, setOpeningArtifactId] = useState<string | null>(null);
   const [openingAttachmentKey, setOpeningAttachmentKey] = useState<string | null>(null);
   const [attachBusy, setAttachBusy] = useState(false);
@@ -268,6 +278,32 @@ export function useDialogController() {
     setFormDoc(null);
   }, []);
 
+  const closeTree = useCallback(() => {
+    setTreeDoc(null);
+  }, []);
+
+  // Навигация из «Дерева» по двойному клику: закрыть дерево, провести активный
+  // путь до узла (в т.ч. в неактивной ветке), перечитать ленту и доскроллить к
+  // нему. Удалённые узлы отсекаются в ядре (activate_path_to вернёт ошибку) —
+  // такой клик перехватывает сам TreeCanvas и до сюда не доходит.
+  const navigateToTreeNode = useCallback(
+    async (nodeId: string) => {
+      const dId = dialogId;
+      if (!dId) return;
+      closeTree();
+      try {
+        await invoke("cmd_activate_path_to", { nodeId });
+      } catch (e) {
+        console.error("activate_path_to failed:", e);
+        return;
+      }
+      await loadBranch(dId);
+      // Лента перерисовывается после loadBranch; фокус — на следующем кадре.
+      setTimeout(() => scrollRef.current?.focusNode(nodeId), 80);
+    },
+    [dialogId, closeTree],
+  );
+
   const confirmPreview = useCallback(async (payload?: { tags?: string[] }) => {
     const handlers = previewHandlersRef.current;
     if (!handlers || previewBusy) return;
@@ -303,10 +339,12 @@ export function useDialogController() {
       onOpenHelp: (doc) => {
         closePreview();
         closeForm();
+        closeTree();
         setHelpDoc(doc);
       },
       onOpenPreview: (doc, handlers) => {
         closeForm();
+        closeTree();
         setHelpDoc(null);
         setPreviewDoc(doc);
         previewHandlersRef.current = handlers;
@@ -314,6 +352,7 @@ export function useDialogController() {
       onClosePreview: closePreview,
       onOpenForm: (doc) => {
         closePreview();
+        closeTree();
         setHelpDoc(null);
         setFormDoc(doc);
       },
@@ -321,8 +360,15 @@ export function useDialogController() {
         setFormDoc(doc);
       },
       onCloseForm: closeForm,
+      onOpenTree: (doc) => {
+        closePreview();
+        closeForm();
+        setHelpDoc(null);
+        setTreeDoc(doc);
+      },
+      onCloseTree: closeTree,
     }),
-    [onFocus, dialogId, closePreview, closeForm],
+    [onFocus, dialogId, closePreview, closeForm, closeTree],
   );
 
   // Перечитать дерево блокнотов и список бесед (структурные изменения).
@@ -1192,6 +1238,10 @@ export function useDialogController() {
     cancelPreview,
     // декларативная форма плагина (D-096)
     formDoc,
+    // визуализатор дерева беседы (плагин «Дерево»)
+    treeDoc,
+    closeTree,
+    navigateToTreeNode,
     // действия корня (D-090)
     rootActions,
     // ветвление

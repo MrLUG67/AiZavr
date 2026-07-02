@@ -374,6 +374,13 @@ export const saveDialog: WidgetDef<State> = {
         return next;
       }
 
+      case '@@lang': {
+        // Смена языка при открытой форме «Сохранить как…» — пересобрать её
+        // из последних опций (liveState) с новыми подписями.
+        cap.ui.refreshForm(buildOptionsForm(liveState.current));
+        return state;
+      }
+
       case 'PICK_START': {
         cap.ui.focus(String(msg.value));
         return {

@@ -26,6 +26,7 @@ import { TagsEditor } from "./TagsEditor";
 import { useMetricsEnabled } from "../settings/metricsSetting";
 import { resolveModelName } from "../widgets/llm/registry";
 import { FormModal } from "../widgets/host/FormModal";
+import { TreeCanvas } from "./TreeCanvas";
 
 export function DialogView({ c }: { c: DialogController }): React.ReactElement {
   const {
@@ -53,6 +54,7 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
     confirmPreview,
     cancelPreview,
     formDoc,
+    treeDoc,
     rootActions,
     branchingFromId,
     composerHeight,
@@ -221,6 +223,12 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
   return (
     <main className="container">
       {formDoc && <FormModal doc={formDoc} />}
+      {treeDoc ? (
+        // Дерево ЗАМЕЩАЕТ область диалога целиком: пока оно открыто, ни ленты, ни
+        // композера, ни шапки — только полотно. Диалог не нужен, пока ищем узел.
+        <TreeCanvas doc={treeDoc} c={c} />
+      ) : (
+      <>
       {previewDoc && (
         <div
           className={`help-doc preview-doc ${
@@ -927,6 +935,8 @@ export function DialogView({ c }: { c: DialogController }): React.ReactElement {
             {t("app.copyMessage")}
           </button>
         </div>
+      )}
+      </>
       )}
     </main>
   );

@@ -50,6 +50,7 @@ button:active { border-color: #396cd8; background-color: #e8e8e8; }
 .container {
   margin: 0;
   padding: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -897,12 +898,12 @@ h1 {
 }
 
 .message.user .message-content {
-  background-color: #396cd8;
-  color: white;
+  background-color: var(--bubble-q-bg);
+  color: var(--bubble-q-fg);
 }
 
 .message.assistant .message-content {
-  background-color: rgba(0,0,0,0.07);
+  background-color: var(--bubble-a-bg);
 }
 
 .message p {
@@ -1052,8 +1053,8 @@ h1 {
 }
 
 .message-content--compressed {
-  background-color: rgba(0,0,0,0.04);
-  border: 1px dashed rgba(0,0,0,0.25);
+  background-color: var(--bubble-s-bg);
+  border: 1px dashed var(--bubble-s-border);
   border-radius: 10px;
   font-size: 0.92rem;
   opacity: 0.92;
@@ -1560,6 +1561,233 @@ h1 {
 }
 .help-doc-link:hover { background: #2f5bb8; }
 
+/* ---------------------------------------------------------------------------
+   Визуализатор дерева беседы (плагин «Дерево»). Замещает ленту диалога целиком:
+   flex:1 блок в колоночном .container. Шапка фиксирована, тело — прокручиваемый
+   холст (вертикаль всегда, горизонталь по необходимости). Цвета узлов внутри
+   холста берутся из общих --bubble-… / --marker-… — общий цвет с лентой.
+--------------------------------------------------------------------------- */
+.tree-canvas {
+  /* Полностью замещает область диалога (лента + композер), а не делит её:
+     оверлей на всю центральную область поверх ленты. Панель виджетов справа —
+     отдельный контейнер, остаётся доступной. */
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fbfbfb;
+}
+.tree-canvas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+.tree-canvas-title { margin: 0; font-size: 18px; }
+.tree-canvas-close {
+  flex-shrink: 0; font-size: 13px; padding: 6px 12px; border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15); background: rgba(0, 0, 0, 0.04); cursor: pointer;
+}
+.tree-canvas-close:hover { background: rgba(0, 0, 0, 0.09); }
+.tree-canvas-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+.tree-canvas-status {
+  padding: 16px;
+  font-size: 13px;
+  color: #888;
+}
+.tree-canvas-error { color: #c0392b; white-space: pre-wrap; }
+
+/* Полотно дерева: холст фиксированного размера внутри прокручиваемого тела. */
+.tree-plane {
+  position: relative;
+}
+/* Связи: тонкие ортогональные линии без стрелок. */
+.tree-edges { pointer-events: none; }
+.tree-edge {
+  stroke: rgba(0, 0, 0, 0.28);
+  stroke-width: 1.25;
+}
+.tree-edge.is-deleted { opacity: var(--deleted-opacity); }
+
+/* Узлы: маленькие прямоугольники цветом из общих --bubble-* (как в ленте). */
+.tree-node {
+  position: absolute;
+  border-radius: 6px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.tree-node--q { background: var(--bubble-q-bg); }
+.tree-node--a { background: var(--bubble-a-bg); }
+.tree-node--s {
+  background: var(--bubble-s-bg);
+  border: 1px dashed var(--bubble-s-border);
+}
+.tree-node--pending {
+  background: var(--bubble-a-bg);
+  border: 1px dashed var(--bubble-s-border);
+  opacity: 0.7;
+}
+.tree-node--artifact {
+  background: var(--bubble-s-bg);
+  border: 1px solid var(--bubble-s-border);
+  color: inherit;
+}
+.tree-node.is-deleted { opacity: var(--deleted-opacity); }
+
+/* Иконки вложений внутри пузыря Q/A: прижаты к правому краю, занимают не более
+   70% ширины (слева остаётся место кликнуть по пузырю — ZOOM/навигация), вдвое
+   мельче диалоговых (26px → 13px). Контейнер прозрачен для кликов, реагируют
+   только сами кнопки-иконки — промежутки «проваливают» клик на пузырь. */
+.tree-node-attachments {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px 3px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tree-node-attachment {
+  pointer-events: auto;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tree-node-attachment:hover { background: rgba(0, 0, 0, 0.16); }
+.tree-node-attachment .artifact-kind-icon { width: 13px; height: 13px; }
+
+/* Группа-якорь для маркерных чипов: центрирована по X узла. */
+.tree-node-group {
+  position: absolute;
+  transform: translateX(-50%);
+}
+.tree-markers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.tree-markers--above { transform: translateY(-100%); }
+
+/* Маркер-чип: текст (комментарий или #N), цвет из общих --marker-*. */
+.tree-marker {
+  max-width: 150px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--marker-active-bg);
+  border: 1px solid var(--marker-active-border);
+  color: var(--marker-active-fg);
+  cursor: pointer;
+}
+
+/* Курсор панорамирования: зажатие+движение по полотну скроллит его. */
+.tree-canvas-body { cursor: grab; }
+.tree-canvas-body.is-panning { cursor: grabbing; }
+.tree-canvas-body.is-panning * { cursor: grabbing !important; }
+
+/* ZOOM-карточка: плавающее превью текста узла Q/A/S поверх полотна. */
+.tree-zoom {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.tree-zoom-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+.tree-zoom-kind {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #555;
+}
+.tree-zoom-model {
+  font-size: 11px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-zoom-close {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: #888;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.tree-zoom-close:hover { background: rgba(0, 0, 0, 0.08); color: #333; }
+.tree-zoom-body { overflow: auto; min-height: 0; padding: 10px 12px; }
+.tree-zoom-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}
+.tree-zoom-empty { font-size: 12px; color: #999; font-style: italic; }
+
+/* Подсказка (напр. про удалённую ветку) — снизу по центру полотна. */
+.tree-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: 80%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
 /* Превью уплотнения — тот же хром, что help-doc (D-008). */
 .preview-doc-body { max-width: none; flex: 1; min-height: 0; }
 
@@ -2019,17 +2247,35 @@ h1 {
     color: #f0f0f0;
   }
 
-  .message.assistant .message-content {
-    background-color: rgba(255,255,255,0.08);
-  }
+  /* Пузыри A и резюме S берут цвет из --bubble-*-* (переопределены ниже в
+     дарк-блоке токенов), поэтому отдельных правил тут больше не нужно. */
 
   .msg-link { color: #79a8ff; }
   .msg-link:hover { color: #9ec3ff; }
 
-  .message-content--compressed {
-    background-color: rgba(255,255,255,0.05);
-    border-color: rgba(255,255,255,0.25);
+  .tree-canvas { background: #232323; }
+  .tree-canvas-head { border-bottom-color: rgba(255,255,255,0.12); }
+  .tree-canvas-close {
+    border-color: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+    color: #ddd;
   }
+  .tree-canvas-close:hover { background: rgba(255,255,255,0.12); }
+  .tree-canvas-status { color: #999; }
+  .tree-edge { stroke: rgba(255,255,255,0.28); }
+  .tree-zoom {
+    background: #2a2a2a;
+    border-color: rgba(255,255,255,0.16);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  }
+  .tree-zoom-head { border-bottom-color: rgba(255,255,255,0.12); }
+  .tree-zoom-kind { color: #bbb; }
+  .tree-zoom-model { color: #888; }
+  .tree-zoom-close { color: #aaa; }
+  .tree-zoom-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .tree-zoom-text { color: #e6e6e6; }
+  .tree-zoom-empty { color: #888; }
+  .tree-notice { background: rgba(255,255,255,0.92); color: #111; }
 
   .artifact-plaque-open {
     border-color: rgba(97, 160, 255, 0.35);
@@ -2331,12 +2577,12 @@ h1 {
 
 .marker-btn {
   background: none;
-  border: 1px solid #ccc;
+  border: 1px solid var(--marker-idle-border);
   border-radius: 6px;
   padding: 2px 8px;
   cursor: pointer;
   font-size: 0.85rem;
-  color: #666;
+  color: var(--marker-idle-fg);
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -2346,9 +2592,9 @@ h1 {
 }
 
 .marker-btn--active {
-  background: #fde8c0;
-  border-color: #e0a92e;
-  color: #8a5a00;
+  background: var(--marker-active-bg);
+  border-color: var(--marker-active-border);
+  color: var(--marker-active-fg);
   font-weight: 600;
 }
 
@@ -2475,6 +2721,20 @@ h1 {
 .widget-section-caret { font-size: 8px; line-height: 1; color: #aaa; width: 10px; }
 .widget-section-title:hover .widget-section-caret { color: #777; }
 .widget-section-name { flex: 1; }
+
+/* Действие в шапке секции (напр. «Открыть дерево»): видно и при сворачивании. */
+.widget-section-action {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid #396cd8;
+  background: #396cd8;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.widget-section-action:hover { background: #2f5bb8; }
 
 /* Активный LLM-провайдер: имя темнее и жирнее (видно, кто обрабатывает ответы). */
 .widget-section-head.is-active .widget-section-name {
@@ -2608,6 +2868,24 @@ h1 {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+/* Цвета узлов беседы — ЕДИНЫЙ источник для ленты диалога и плагина «Дерево».
+   Плагин «Дерево» рисует узлы этими же токенами, поэтому смена цвета здесь
+   (в т.ч. будущая пользовательская настройка) едет и в диалог, и в дерево. */
+:root {
+  --bubble-q-bg: #396cd8;            /* вопрос (Q, user_message) */
+  --bubble-q-fg: #ffffff;
+  --bubble-a-bg: rgba(0,0,0,0.07);   /* ответ (A, assistant_message) */
+  --bubble-s-bg: rgba(0,0,0,0.04);   /* резюме сжатия (S, compressed_summary) */
+  --bubble-s-border: rgba(0,0,0,0.25);
+  --marker-active-bg: #fde8c0;       /* активный маркер (⚑) */
+  --marker-active-border: #e0a92e;
+  --marker-active-fg: #8a5a00;
+  --marker-idle-border: #ccc;        /* маркер без активности */
+  --marker-idle-fg: #666;
+  /* «Удалённое» в дереве — те же цвета, но приглушены прозрачностью. */
+  --deleted-opacity: 0.4;
+}
+
 /* слоты цвета светофора (concept v5) — одинаковы в обеих темах */
 :root {
   --meter-ok:   #2da44e;
@@ -2638,6 +2916,9 @@ h1 {
   .widget-section-head.is-active .widget-section-name { color: #fff; font-weight: 700; }
   .widget-section-head.is-not-ready .widget-section-name { color: #666; }
   .widget-section-head.is-not-ready .widget-section-caret { color: #555; }
+  .widget-section-action { background: #61a0ff; border-color: #61a0ff; color: #111; }
+  .widget-section-action:hover { background: #4d8de6; }
+  .tree-node-attachment:hover { background: rgba(255, 255, 255, 0.2); }
 
   .widget-text { color: #ddd; }
   .widget-text.is-muted { color: #888; }
@@ -2687,6 +2968,11 @@ h1 {
     --meter-warn: #d29922;
     --meter-high: #e07b39;
     --meter-crit: #f85149;
+
+    /* Цвета узлов беседы в тёмной теме (Q и маркеры одинаковы в обеих темах). */
+    --bubble-a-bg: rgba(255,255,255,0.08);
+    --bubble-s-bg: rgba(255,255,255,0.05);
+    --bubble-s-border: rgba(255,255,255,0.25);
   }
 }
 

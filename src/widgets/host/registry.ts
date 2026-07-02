@@ -15,6 +15,7 @@ import { tagger } from '../tagger';
 import { saveDialog } from '../save-dialog';
 import { openrouter } from '../openrouter';
 import { gemini } from '../gemini';
+import { tree } from '../tree';
 
 // Гетерогенность State: у каждого виджета свой тип состояния (светофор — null,
 // сжатие — мастер выбора диапазона). Хранить их в одной мапе строго типобезопасно
@@ -34,6 +35,7 @@ const WIDGETS: Record<string, AnyWidgetDef> = {
   [compressor.manifest.id]: compressor as AnyWidgetDef,
   [tagger.manifest.id]: tagger as AnyWidgetDef,
   [saveDialog.manifest.id]: saveDialog as AnyWidgetDef,
+  [tree.manifest.id]: tree as AnyWidgetDef,
 };
 
 // Инвариант ключ===id: ловим рассинхрон на старте, а не молчим.

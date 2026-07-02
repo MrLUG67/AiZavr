@@ -32,7 +32,8 @@ import {
 } from '../llm/pluginSettings';
 import { dispatchWidgetMsg } from '../host/widgetDispatch';
 import { fetchModels, chatCompletion, type OpenRouterModel } from './api';
-import { OPENROUTER_MODALITY_FILTER_UI } from './settings';
+import { openRouterModalityFilterUi } from './settings';
+import { ct } from './i18n';
 
 const PLUGIN_ID = 'openrouter';
 const PLUGIN_VERSION = '0.1.0';
@@ -213,7 +214,7 @@ async function loadModels(
     // HTTP/ключевые ошибки (Error с кодом статуса) — не transient.
     const transient = e instanceof TypeError;
     const error = transient
-      ? 'Нет связи с сервером OpenRouter — проверьте интернет.'
+      ? ct('error.noConnection')
       : String(e);
     return { models: [], error, transient };
   }
@@ -256,12 +257,10 @@ async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise
   return buildLlmSettingsForm(
     {
       pluginId: PLUGIN_ID,
-      title: 'Настройки OpenRouter',
+      title: ct('settings.title'),
       keysUrl: KEYS_URL,
-      keysLinkLabel: 'Открыть openrouter.ai/keys',
-      keyInstructions:
-        'Получите API-ключ на openrouter.ai/keys и вставьте его ниже. ' +
-        'Ключ хранится в системном хранилище.',
+      keysLinkLabel: ct('settings.keysLink'),
+      keyInstructions: ct('settings.keyInstructions'),
       keyPlaceholder: state.hasApiKey ? '••••••••' : 'sk-or-...',
     },
     {
@@ -274,7 +273,7 @@ async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise
       error: state.error,
       keyVerifyStatus: state.keyVerifyStatus,
       keyVerifyMessage: state.keyVerifyMessage,
-      modalityFilter: OPENROUTER_MODALITY_FILTER_UI,
+      modalityFilter: openRouterModalityFilterUi(),
     },
   );
 }
@@ -326,40 +325,37 @@ export const openrouter: WidgetDef<State> = {
     const workChildren: ControlNode[] = [];
 
     if (!state.hasApiKey) {
-      workChildren.push(text('Укажите API-ключ (⚙ вверху слева)', true));
+      workChildren.push(text(ct('panel.noKey'), true));
     } else if (state.loadingModels) {
-      workChildren.push(text('Загрузка моделей…', true));
+      workChildren.push(text(ct('panel.loadingModels'), true));
     } else if (state.models.length === 0) {
       workChildren.push(
-        text('Модели не загружены. Проверьте ключ и соединение.', true),
+        text(ct('panel.modelsNotLoaded'), true),
       );
       workChildren.push({
         kind: 'button',
-        label: 'Повторить загрузку',
+        label: ct('panel.retry'),
         onClick: { type: 'retryLoad' },
       });
     } else {
-      workChildren.push(text(`Модель: ${model?.name ?? state.selectedModelId}`));
+      workChildren.push(text(ct('panel.model', { name: model?.name ?? state.selectedModelId })));
       if (model && !canProcessDialog(model)) {
         workChildren.push(
-          text(
-            'Не для диалога (нет текстового выхода). Выберите другую на вкладке «Избранные».',
-            true,
-          ),
+          text(ct('panel.notForDialog'), true),
         );
       } else if (model) {
         workChildren.push(
-          text(`Окно: ${model.contextWindow.toLocaleString()} токенов`, true),
+          text(ct('panel.window', { tokens: model.contextWindow.toLocaleString() }), true),
         );
       } else {
         workChildren.push(
-          text('Модель не найдена в списке — выберите другую в ⚙', true),
+          text(ct('panel.modelNotFound'), true),
         );
       }
       if (isActive) {
-        workChildren.push(text('● Обрабатывает диалог', false));
+        workChildren.push(text(ct('panel.processing'), false));
       } else if (ready) {
-        workChildren.push(text('Готов — выберите радио в заголовке', true));
+        workChildren.push(text(ct('panel.ready'), true));
       }
     }
 
@@ -376,7 +372,7 @@ export const openrouter: WidgetDef<State> = {
             {
               kind: 'iconButton',
               icon: '⚙',
-              title: 'Настройки',
+              title: ct('settings.gearTitle'),
               onClick: { type: 'OPEN_SETTINGS' },
             },
             { kind: 'spacer' },
@@ -428,6 +424,12 @@ export const openrouter: WidgetDef<State> = {
         }
         return next;
       })();
+    }
+
+    // Смена языка при открытой форме — пересобрать её с новыми подписями.
+    if (msg.type === '@@lang') {
+      if (state.settingsOpen) void refreshSettingsForm(liveState.current, cap);
+      return state;
     }
 
     if (msg.type === 'OPEN_SETTINGS') {
@@ -519,7 +521,7 @@ export const openrouter: WidgetDef<State> = {
           const next: State = {
             ...state,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: 'Введите ключ для проверки.',
+            keyVerifyMessage: ct('keyVerify.enterToVerify'),
           };
           liveState.current = next;
           await refreshSettingsForm(next, cap);
@@ -538,13 +540,13 @@ export const openrouter: WidgetDef<State> = {
           next = {
             ...next,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: error ?? 'Ключ не прошёл проверку — модели не загружены.',
+            keyVerifyMessage: error ?? ct('keyVerify.failed'),
           };
         } else {
           next = {
             ...next,
             keyVerifyStatus: 'ok',
-            keyVerifyMessage: `Ключ действителен. Доступно моделей: ${models.length}.`,
+            keyVerifyMessage: ct('keyVerify.valid', { count: models.length }),
           };
         }
         liveState.current = next;
@@ -562,7 +564,7 @@ export const openrouter: WidgetDef<State> = {
           const next: State = {
             ...state,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: 'Введите ключ для сохранения.',
+            keyVerifyMessage: ct('keyVerify.enterToSave'),
           };
           liveState.current = next;
           await refreshSettingsForm(next, cap);
@@ -574,7 +576,7 @@ export const openrouter: WidgetDef<State> = {
           hasApiKey: true,
           loadingModels: true,
           keyVerifyStatus: 'ok',
-          keyVerifyMessage: 'Ключ сохранён.',
+          keyVerifyMessage: ct('keyVerify.saved'),
           error: null,
         };
         liveState.current = next;

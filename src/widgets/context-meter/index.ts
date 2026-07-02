@@ -17,6 +17,7 @@ import type {
   ViewResult,
   NodeView,
 } from '../host/types';
+import { ct } from './i18n';
 
 type State = null;
 
@@ -73,7 +74,7 @@ function fmt(n: number): string {
 export const contextMeter: WidgetDef<State> = {
   manifest: {
     id: 'context-meter',
-    title: 'Контекст',
+    title: ct('title'),
     icon: 'gauge',
     defaultOpen: true,
     order: 10,
@@ -96,7 +97,7 @@ export const contextMeter: WidgetDef<State> = {
     // ТОНКИЙ рубеж (D-083): беседы нет -> штатное «нечего делать». Серую плашку
     // с этим reason рисует ХОСТ единообразно; сам плагин её не верстает.
     if (!facts.activeDialogId || facts.activeBranch.length === 0) {
-      return { inactive: true, reason: 'Нет активной беседы' };
+      return { inactive: true, reason: ct('inactive.noDialog') };
     }
 
     const end = boundaryIndex(facts.activeBranch, facts.visibleBoundaryNodeId);
@@ -125,7 +126,7 @@ export const contextMeter: WidgetDef<State> = {
         {
           kind: 'text',
           tone: 'muted',
-          value: `≈ ${fmt(tokens)} / ${fmt(window)} токенов`,
+          value: ct('tokens', { tokens: fmt(tokens), window: fmt(window) }),
         },
       ],
     };

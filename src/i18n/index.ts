@@ -11,7 +11,10 @@
 //
 // Множественное число НЕ разруливаем правилами: где в русском «ветки», там в
 // английском просто branch(es) — дословная подстановка, по договорённости.
-// Плагины (widgets/*) сюда НЕ входят — у них будут свои файлы локалей позже.
+// Плагины (widgets/*) держат ключи в тех же JSON под namespace widgets.<id>.*
+// и переводят через тонкие ct()-обёртки (см. widgets/*/i18n.ts). Живая смена
+// языка для их ОТКРЫТЫХ форм — через пересборку по сообщению @@lang (виджет
+// перестраивает FormDoc из текущего state с новыми t()-строками).
 
 import { useEffect, useReducer } from "react";
 
@@ -75,6 +78,14 @@ try {
 
 export function getLang(): Lang {
   return currentLang;
+}
+
+// kebab-case id плагина -> camelCase сегмент ключа локали
+// ('save-dialog' -> 'saveDialog', 'context-meter' -> 'contextMeter'). Плагины
+// именуют ключи под widgets.<camel>.*, поэтому хром (напр. заголовок в панели)
+// собирает ключ через эту нормализацию, а не по сырому id.
+export function pluginLocaleId(id: string): string {
+  return id.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
 // Список доступных языков для меню (отсортирован по самоназванию).

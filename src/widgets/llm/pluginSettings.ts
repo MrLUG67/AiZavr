@@ -10,14 +10,20 @@ import type {
   ModelTableModalityFilterUi,
 } from '../host/types';
 import { formatCapabilitiesHint } from './capabilities';
+import { lt } from './i18n';
+import { t } from '../../i18n';
 
-/** Подписи фильтра модальностей над таблицей моделей (общие для всех LLM-плагинов). */
-export const MODALITY_FILTER_UI: ModelTableModalityFilterUi = {
-  inputLabel: 'Вход — что можно отправить',
-  outputLabel: 'Выход — что модель обязана вернуть',
-  inputHint: 'Мягкий фильтр: модель должна принимать отмеченное (может уметь больше).',
-  outputHint: 'Жёсткий фильтр: модель должна выдавать всё отмеченное.',
-};
+/** Подписи фильтра модальностей над таблицей моделей (общие для всех LLM-плагинов).
+ *  Функция, а не константа: строки берутся при сборке формы, чтобы смена языка
+ *  подхватывалась пересборкой (@@lang). */
+export function modalityFilterUi(): ModelTableModalityFilterUi {
+  return {
+    inputLabel: lt('modality.inputLabel'),
+    outputLabel: lt('modality.outputLabel'),
+    inputHint: lt('modality.inputHint'),
+    outputHint: lt('modality.outputHint'),
+  };
+}
 
 export interface LlmPluginConfig {
   selectedModelId: string;
@@ -169,21 +175,18 @@ export function buildLlmSettingsForm(
     kind: 'stack',
     children:
       !state.hasApiKey
-        ? [text('Сначала укажите API-ключ на вкладке «API Key».', true)]
+        ? [text(lt('favorites.noKeyFirst'), true)]
         : state.loadingModels
-          ? [text('Загрузка моделей…', true)]
+          ? [text(t('app.settings.loadingModels'), true)]
           : favoriteModels.length === 0
             ? [
-                text(
-                  'Нет избранных моделей. Отметьте нужные на вкладке «Все модели».',
-                  true,
-                ),
+                text(lt('favorites.empty'), true),
               ]
             : [
                 {
                   kind: 'field',
-                  label: 'Модель из избранных',
-                  hint: 'Выберите модель для обработки диалога. «−» убирает из избранного.',
+                  label: lt('favorites.modelLabel'),
+                  hint: lt('favorites.modelHint'),
                   child: {
                     kind: 'favoriteModelList',
                     name: 'modelId',
@@ -201,17 +204,14 @@ export function buildLlmSettingsForm(
   const allModelsTab: ControlNode = {
     kind: 'stack',
     children: [
-      text(
-        'Отметьте модели для избранного — они появятся на первой вкладке.',
-        true,
-      ),
+      text(lt('allModels.hint'), true),
       {
         kind: 'modelTable',
         name: 'favoriteModelIds',
         value: serializeFavorites(favorites),
         rows: toTableRows(state.models),
         disabled: state.loadingModels || !state.hasApiKey,
-        searchPlaceholder: 'Фильтр по названию…',
+        searchPlaceholder: lt('allModels.searchPlaceholder'),
         modalityFilter: state.modalityFilter,
       },
     ],
@@ -223,12 +223,12 @@ export function buildLlmSettingsForm(
     apiKeyChildren.push({
       kind: 'row',
       children: [
-        text(`Текущий ключ: ${state.maskedKey}`),
+        text(lt('apiKey.current', { key: state.maskedKey })),
         { kind: 'spacer' },
         {
           kind: 'iconButton',
           icon: '−',
-          title: 'Удалить ключ',
+          title: lt('apiKey.delete'),
           onClick: { type: 'FORM_DELETE_KEY' },
         },
       ],
@@ -240,10 +240,10 @@ export function buildLlmSettingsForm(
     { kind: 'link', label: labels.keysLinkLabel, href: labels.keysUrl },
     {
       kind: 'field',
-      label: 'Новый API-ключ',
+      label: lt('apiKey.new'),
       hint: state.hasApiKey
-        ? 'Введите новый ключ, чтобы заменить текущий.'
-        : 'Вставьте ключ и нажмите «Сохранить ключ».',
+        ? lt('apiKey.replaceHint')
+        : lt('apiKey.saveHint'),
       child: {
         kind: 'textInput',
         name: 'apiKey',
@@ -257,13 +257,13 @@ export function buildLlmSettingsForm(
       children: [
         {
           kind: 'button',
-          label: state.keyVerifyStatus === 'checking' ? 'Проверка…' : 'Проверить ключ',
+          label: state.keyVerifyStatus === 'checking' ? lt('apiKey.checking') : lt('apiKey.verify'),
           disabled: state.keyVerifyStatus === 'checking',
           onClick: { type: 'FORM_VERIFY_KEY' },
         },
         {
           kind: 'button',
-          label: 'Сохранить ключ',
+          label: lt('apiKey.save'),
           primary: true,
           onClick: { type: 'FORM_SAVE_KEY' },
         },
@@ -283,8 +283,8 @@ export function buildLlmSettingsForm(
   return {
     widgetId: labels.pluginId,
     title: labels.title,
-    submitLabel: 'Применить',
-    cancelLabel: 'Отмена',
+    submitLabel: t('app.settings.apply'),
+    cancelLabel: t('app.settings.cancel'),
     submitMsg: { type: 'FORM_SUBMIT' },
     cancelMsg: { type: 'FORM_CANCEL' },
     busy: state.loadingModels || state.keyVerifyStatus === 'checking',
@@ -292,9 +292,9 @@ export function buildLlmSettingsForm(
     body: {
       kind: 'tabs',
       tabs: [
-        { id: 'favorites', label: 'Избранные', child: favoritesTab },
-        { id: 'all', label: 'Все модели', child: allModelsTab },
-        { id: 'apikey', label: 'API Key', child: apiKeyTab },
+        { id: 'favorites', label: lt('tab.favorites'), child: favoritesTab },
+        { id: 'all', label: lt('tab.allModels'), child: allModelsTab },
+        { id: 'apikey', label: lt('tab.apiKey'), child: apiKeyTab },
       ],
     },
   };

@@ -451,6 +451,16 @@ export const tagger: WidgetDef<State> = {
         return next;
       }
 
+      case '@@lang': {
+        // Смена языка при открытой форме — пересобрать с новыми подписями,
+        // подгрузив модели текущего провайдера (в state их во время правки нет).
+        if (state.settingsCenterOpen) {
+          const { models, error } = await loadModelsForBackend(state.config.backend, cap);
+          cap.ui.refreshForm(await buildSettingsForm(cap, state.config, models, { error }));
+        }
+        return state;
+      }
+
       case 'OPEN_SETTINGS': {
         const next = { ...state, settingsCenterOpen: true, error: null };
         liveState.current = next;

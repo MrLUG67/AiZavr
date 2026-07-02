@@ -328,6 +328,26 @@ async fn cmd_get_depth_indicators(
     tree::get_depth_indicators(&state.db, &dialog_id).await
 }
 
+/// Полная топология беседы для визуализатора «Дерево»: все узлы (включая
+/// удалённые и анкоры) + маркеры на каждом.
+#[tauri::command]
+async fn cmd_get_full_tree(
+    state: tauri::State<'_, AppState>,
+    dialog_id: String,
+) -> Result<Vec<tree::TreeNode>, String> {
+    tree::get_full_tree(&state.db, &dialog_id).await
+}
+
+/// Сделать узел активным (провести активный путь корень→узел и поставить курсор).
+/// Для двойного клика в «Дереве» по узлу неактивной ветки перед доскроллом.
+#[tauri::command]
+async fn cmd_activate_path_to(
+    state: tauri::State<'_, AppState>,
+    node_id: String,
+) -> Result<(), String> {
+    tree::activate_path_to(&state.db, &node_id).await
+}
+
 /// Отправка пользовательского сообщения (устойчивый поток).
 /// Создаёт Q + unanswered_placeholder атомарно. Реальный ответ затем
 /// приходит через cmd_resolve_answer(placeholder_id, ...).
@@ -766,6 +786,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        // Сохраняет геометрию и развёрнутость окна при закрытии и восстанавливает
+        // её при следующем запуске (размер, позиция, maximized/fullscreen).
+        // Регистрируем в цепочке до создания окна — так восстанавливается и
+        // главное окно из tauri.conf.json. Состояние пишется в файл в app data.
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -814,6 +839,8 @@ pub fn run() {
             cmd_delete_branch,
             cmd_restore_branch,
             cmd_get_depth_indicators,
+            cmd_get_full_tree,
+            cmd_activate_path_to,
             cmd_send_user_message,
             cmd_resolve_answer,
             cmd_create_marker,

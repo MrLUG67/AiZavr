@@ -17,6 +17,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+# Запоминает размер/позицию/развёрнутость окна и восстанавливает при перезапуске.
+tauri-plugin-window-state = "2"
 open = "5"
 
 # Serialization

@@ -1,5 +1,6 @@
 // HTTP-клиент OpenRouter — живёт в плагине, не в ядре.
 import type { ChatMessage, ChatMediaPart } from '../host/types';
+import { ct } from './i18n';
 import type { LlmResponse } from '../llm/types';
 import { extractFromOpenAiContent } from '../llm/extractMedia';
 import { capabilitiesFromOpenRouter } from '../llm/capabilities';
@@ -223,10 +224,7 @@ export async function chatCompletion(
   const body = await resp.text();
   if (!resp.ok) {
     if (resp.status === 402) {
-      throw new Error(
-        'Недостаточно средств для работы с данной моделью. ' +
-          'Пополните баланс OpenRouter или выберите более дешёвую модель.',
-      );
+      throw new Error(ct('api.insufficientFunds'));
     }
     throw new Error(`OpenRouter HTTP ${resp.status}: ${body}`);
   }
@@ -235,7 +233,7 @@ export async function chatCompletion(
   try {
     parsed = JSON.parse(body);
   } catch {
-    throw new Error(`OpenRouter: не удалось разобрать ответ. Body: ${body}`);
+    throw new Error(ct('api.parseFailed', { body }));
   }
 
   if (parsed.error?.message) {
@@ -257,13 +255,13 @@ export async function chatCompletion(
   if (!content && media.length === 0) {
     const reason = choice?.finish_reason ?? 'unknown';
     throw new Error(
-      `OpenRouter: пустой ответ (finish_reason=${reason}, model=${modelId}). Body: ${body.slice(0, 500)}`,
+      ct('api.emptyResponse', { reason, model: modelId, body: body.slice(0, 500) }),
     );
   }
 
   // Ответ только картинкой, без текста — даём заголовок «Ответ:», чтобы плашки
   // не висели в пустом пузыре без подписи.
-  const finalContent = content || 'Ответ:';
+  const finalContent = content || ct('api.answerFallback');
 
   return {
     content: finalContent,

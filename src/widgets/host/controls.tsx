@@ -13,7 +13,7 @@ import {
   matchesModalityFilter,
   modalityFilterActive,
   MODALITY_KINDS,
-  MODALITY_LABELS,
+  modalityLabel,
   type ModalityFilterState,
 } from '../llm/capabilities';
 
@@ -472,7 +472,7 @@ function ModalityFilterPanel(props: {
               disabled={disabled}
               onChange={() => toggle(side, k)}
             />
-            <span>{MODALITY_LABELS[k]}</span>
+            <span>{modalityLabel(k)}</span>
           </label>
         ))}
       </div>

@@ -52,7 +52,10 @@ export function WidgetHost<State>(props: {
   def: WidgetDef<State>;
   facts: WidgetFacts;
   capabilityDeps: CapabilityDeps;
-}): React.ReactElement {
+  // Секция свёрнута: хост остаётся смонтированным (TEA-цикл жив, dispatch
+  // зарегистрирован — работает headerAction), но НИЧЕГО не рисует.
+  collapsed?: boolean;
+}): React.ReactElement | null {
   const { def, facts, capabilityDeps } = props;
 
   // Капабилити привязаны к ЭТОМУ виджету (D-095): pluginId = manifest.id берёт
@@ -132,6 +135,11 @@ export function WidgetHost<State>(props: {
   }, []);
 
   // ---- render ----
+
+  // Свёрнутая секция: тело не рисуем, но хук-эффекты выше уже отработали —
+  // @@mount выполнен, dispatch зарегистрирован, поэтому headerAction в шапке
+  // остаётся рабочим. Ранний выход строго ПОСЛЕ всех хуков (порядок хуков стабилен).
+  if (props.collapsed) return null;
 
   // (1) Сбой плагина (D-070/D-073) — приоритетнее всего: упал => плашка сбоя,
   // независимо от применимости. role=alert (это ОШИБКА, не штатное состояние).

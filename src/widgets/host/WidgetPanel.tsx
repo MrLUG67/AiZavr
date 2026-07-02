@@ -13,8 +13,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { listWidgets } from './registry';
 import { WidgetHost } from './WidgetHost';
 import { type CapabilityDeps } from './capabilities';
+import { dispatchWidgetMsg } from './widgetDispatch';
 import type { WidgetFacts } from './types';
-import { t } from '../../i18n';
+import { t, useLang, pluginLocaleId } from '../../i18n';
 
 const LS_OPEN = 'aizavr.panel.open';
 const LS_PINNED = 'aizavr.panel.pinned';
@@ -28,7 +29,7 @@ const WIDTH_MAX = 560;
 const WIDTH_DEFAULT = 320;
 
 function widgetTitle(id: string, fallback: string): string {
-  const key = `widgets.${id}.title`;
+  const key = `widgets.${pluginLocaleId(id)}.title`;
   const tr = t(key);
   return tr === key ? fallback : tr;
 }
@@ -66,6 +67,9 @@ export function WidgetPanel(props: {
   llmSelection: LlmSelection;
 }): React.ReactElement {
   const { facts, capabilityDeps, llmSelection } = props;
+
+  // Перерисовка хрома панели при смене языка (заголовки/подсказки через t()).
+  useLang();
 
   // Пин запоминается всегда; open инициализируется пином (закреплён -> открыта).
   const [pinned, setPinned] = useState(() => readBool(LS_PINNED, false));
@@ -106,7 +110,7 @@ export function WidgetPanel(props: {
       <div className="widget-rail">
         <button
           className="widget-rail-expand"
-          title="Развернуть панель"
+          title={t('panel.expand')}
           onClick={() => setOpen(true)}
         >
           ◀
@@ -149,20 +153,20 @@ export function WidgetPanel(props: {
 
       {/* шапка: шестерёнка/быстрые действия + пин + свернуть */}
       <header className="widget-panel-head">
-        <button className="widget-panel-gear" title="Настройки" onClick={() => {/* TODO: настройки панели */}}>
+        <button className="widget-panel-gear" title={t('panel.settings')} onClick={() => {/* TODO: настройки панели */}}>
           ⚙
         </button>
         <div className="widget-panel-head-spacer" />
         <button
           className={`widget-panel-pin ${pinned ? 'is-pinned' : ''}`}
-          title={pinned ? 'Открепить' : 'Закрепить открытой'}
+          title={pinned ? t('panel.unpin') : t('panel.pin')}
           onClick={() => setPinned((p) => !p)}
         >
           📌
         </button>
         <button
           className="widget-panel-collapse"
-          title="Свернуть панель"
+          title={t('panel.collapse')}
           onClick={() => setOpen(false)}
         >
           ▶
@@ -181,6 +185,10 @@ export function WidgetPanel(props: {
           const isLlm = def.manifest.providesLlm === true;
           const isReady = isLlm && llmSelection.readyIds.includes(id);
           const isActive = isLlm && llmSelection.activeId === id;
+
+          // Действие в шапке секции (видно и при сворачивании). Пока оно есть,
+          // хост держим смонтированным даже свёрнутым — иначе клик некуда слать.
+          const headerAction = def.headerAction ? def.headerAction(facts) : null;
 
           return (
             <section
@@ -202,8 +210,8 @@ export function WidgetPanel(props: {
                     onChange={() => { if (isReady) llmSelection.onSelect(id); }}
                     title={
                       isReady
-                        ? 'Обрабатывать ответы этим плагином'
-                        : 'Плагин не готов: нет валидного API-ключа'
+                        ? t('panel.llmActive')
+                        : t('panel.llmNotReady')
                     }
                   />
                 )}
@@ -212,18 +220,37 @@ export function WidgetPanel(props: {
                   className="widget-section-title"
                   onClick={() => toggleCollapsed(id)}
                   aria-expanded={!isCollapsed}
-                  title={isCollapsed ? 'Развернуть' : 'Свернуть'}
+                  title={isCollapsed ? t('panel.expandWidget') : t('panel.collapseWidget')}
                 >
                   <span className="widget-section-caret">
                     {isCollapsed ? '▼' : '▲'}
                   </span>
                   <span className="widget-section-name">{widgetTitle(id, def.manifest.title)}</span>
                 </button>
+                {headerAction && (
+                  <button
+                    type="button"
+                    className="widget-section-action"
+                    onClick={() => dispatchWidgetMsg(id, headerAction.msg)}
+                  >
+                    {headerAction.label}
+                  </button>
+                )}
               </div>
               {!isCollapsed && (
                 <div className="widget-section-content">
                   <WidgetHost def={def} facts={facts} capabilityDeps={capabilityDeps} />
                 </div>
+              )}
+              {isCollapsed && headerAction && (
+                // Свёрнута, но есть действие в шапке: хост жив (рисует null),
+                // чтобы dispatch из шапки доходил до update.
+                <WidgetHost
+                  def={def}
+                  facts={facts}
+                  capabilityDeps={capabilityDeps}
+                  collapsed
+                />
               )}
             </section>
           );

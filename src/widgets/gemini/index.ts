@@ -27,12 +27,13 @@ import {
   configFromFormValues,
   applyRemoveFavorite,
   seedFavoritesIfEmpty,
-  MODALITY_FILTER_UI,
+  modalityFilterUi,
   type LlmPluginConfig,
   type LlmModelRow,
 } from '../llm/pluginSettings';
 import { dispatchWidgetMsg } from '../host/widgetDispatch';
 import { fetchModels, chatCompletion, type GeminiModel } from './api';
+import { ct } from './i18n';
 
 const PLUGIN_ID = 'gemini';
 const PLUGIN_VERSION = '0.1.0';
@@ -207,7 +208,7 @@ async function loadModels(
     // HTTP/ключевые ошибки приходят как Error из friendlyError — не transient.
     const transient = e instanceof TypeError;
     const error = transient
-      ? 'Нет связи с сервером Gemini — проверьте интернет.'
+      ? ct('error.noConnection')
       : String(e);
     return { models: [], error, transient };
   }
@@ -250,12 +251,10 @@ async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise
   return buildLlmSettingsForm(
     {
       pluginId: PLUGIN_ID,
-      title: 'Настройки Gemini',
+      title: ct('settings.title'),
       keysUrl: KEYS_URL,
-      keysLinkLabel: 'Открыть aistudio.google.com/apikey',
-      keyInstructions:
-        'Бесплатный ключ из Google AI Studio. Войдите гугл-аккаунтом, ' +
-        'создайте ключ и вставьте его ниже.',
+      keysLinkLabel: ct('settings.keysLink'),
+      keyInstructions: ct('settings.keyInstructions'),
       keyPlaceholder: state.hasApiKey ? '••••••••' : 'AIza...',
     },
     {
@@ -268,7 +267,7 @@ async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise
       error: state.error,
       keyVerifyStatus: state.keyVerifyStatus,
       keyVerifyMessage: state.keyVerifyMessage,
-      modalityFilter: MODALITY_FILTER_UI,
+      modalityFilter: modalityFilterUi(),
     },
   );
 }
@@ -320,40 +319,37 @@ export const gemini: WidgetDef<State> = {
     const workChildren: ControlNode[] = [];
 
     if (!state.hasApiKey) {
-      workChildren.push(text('Укажите бесплатный API-ключ (⚙ вверху слева)', true));
+      workChildren.push(text(ct('panel.noKey'), true));
     } else if (state.loadingModels) {
-      workChildren.push(text('Загрузка моделей…', true));
+      workChildren.push(text(ct('panel.loadingModels'), true));
     } else if (state.models.length === 0) {
       workChildren.push(
-        text('Модели не загружены. Проверьте ключ и соединение.', true),
+        text(ct('panel.modelsNotLoaded'), true),
       );
       workChildren.push({
         kind: 'button',
-        label: 'Повторить загрузку',
+        label: ct('panel.retry'),
         onClick: { type: 'retryLoad' },
       });
     } else {
-      workChildren.push(text(`Модель: ${model?.name ?? state.selectedModelId}`));
+      workChildren.push(text(ct('panel.model', { name: model?.name ?? state.selectedModelId })));
       if (model && !canProcessDialog(model)) {
         workChildren.push(
-          text(
-            'Не для диалога (нет текстового выхода). Выберите другую на вкладке «Избранные».',
-            true,
-          ),
+          text(ct('panel.notForDialog'), true),
         );
       } else if (model) {
         workChildren.push(
-          text(`Окно: ${model.contextWindow.toLocaleString()} токенов`, true),
+          text(ct('panel.window', { tokens: model.contextWindow.toLocaleString() }), true),
         );
       } else {
         workChildren.push(
-          text('Модель не найдена в списке — выберите другую в ⚙', true),
+          text(ct('panel.modelNotFound'), true),
         );
       }
       if (isActive) {
-        workChildren.push(text('● Обрабатывает диалог', false));
+        workChildren.push(text(ct('panel.processing'), false));
       } else if (ready) {
-        workChildren.push(text('Готов — выберите радио в заголовке', true));
+        workChildren.push(text(ct('panel.ready'), true));
       }
     }
 
@@ -370,7 +366,7 @@ export const gemini: WidgetDef<State> = {
             {
               kind: 'iconButton',
               icon: '⚙',
-              title: 'Настройки',
+              title: ct('settings.gearTitle'),
               onClick: { type: 'OPEN_SETTINGS' },
             },
             { kind: 'spacer' },
@@ -422,6 +418,12 @@ export const gemini: WidgetDef<State> = {
         }
         return next;
       })();
+    }
+
+    // Смена языка при открытой форме — пересобрать её с новыми подписями.
+    if (msg.type === '@@lang') {
+      if (state.settingsOpen) void refreshSettingsForm(liveState.current, cap);
+      return state;
     }
 
     if (msg.type === 'OPEN_SETTINGS') {
@@ -513,7 +515,7 @@ export const gemini: WidgetDef<State> = {
           const next: State = {
             ...state,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: 'Введите ключ для проверки.',
+            keyVerifyMessage: ct('keyVerify.enterToVerify'),
           };
           liveState.current = next;
           await refreshSettingsForm(next, cap);
@@ -532,13 +534,13 @@ export const gemini: WidgetDef<State> = {
           next = {
             ...next,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: error ?? 'Ключ не прошёл проверку — модели не загружены.',
+            keyVerifyMessage: error ?? ct('keyVerify.failed'),
           };
         } else {
           next = {
             ...next,
             keyVerifyStatus: 'ok',
-            keyVerifyMessage: `Ключ действителен. Доступно моделей: ${models.length}.`,
+            keyVerifyMessage: ct('keyVerify.valid', { count: models.length }),
           };
         }
         liveState.current = next;
@@ -556,7 +558,7 @@ export const gemini: WidgetDef<State> = {
           const next: State = {
             ...state,
             keyVerifyStatus: 'fail',
-            keyVerifyMessage: 'Введите ключ для сохранения.',
+            keyVerifyMessage: ct('keyVerify.enterToSave'),
           };
           liveState.current = next;
           await refreshSettingsForm(next, cap);
@@ -568,7 +570,7 @@ export const gemini: WidgetDef<State> = {
           hasApiKey: true,
           loadingModels: true,
           keyVerifyStatus: 'ok',
-          keyVerifyMessage: 'Ключ сохранён.',
+          keyVerifyMessage: ct('keyVerify.saved'),
           error: null,
         };
         liveState.current = next;

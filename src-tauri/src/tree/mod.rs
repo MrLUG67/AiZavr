@@ -197,6 +197,110 @@ pub async fn restore_branch_atomic(
         .map_err(|e| e.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// Полное дерево беседы (плагин «Дерево»)
+// ---------------------------------------------------------------------------
+
+/// Узел полной топологии для визуализатора «Дерево». В отличие от NodeView
+/// (обеднённая проекция для маркеров) несёт связи (parent/active_child), флаг
+/// удаления, происхождение ответа (model/plugin) и extra (мета артефакта парсит
+/// фронт, как в экспорте). Маркеры приложены сразу — дерево рисует их подписи
+/// без отдельного запроса на узел.
+#[derive(Debug, serde::Serialize)]
+pub struct TreeNode {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub node_type: String,
+    pub content: String,
+    pub active_child_id: Option<String>,
+    pub is_deleted: bool,
+    pub model_id: Option<String>,
+    pub plugin_id: Option<String>,
+    pub extra: Option<String>,
+    pub created_at: String,
+    pub markers: Vec<markers::Marker>,
+}
+
+/// Полная топология беседы: ВСЕ узлы (включая удалённые и анкоры) + маркеры на
+/// каждом. Дерево строит фронт по parent_id, активный путь — по active_child_id,
+/// удалённые ветки прячет/приглушает по is_deleted. Маркеры берём одним запросом
+/// на диалог и группируем по node_id (без N+1).
+pub async fn get_full_tree(
+    pool: &SqlitePool,
+    dialog_id: &str,
+) -> Result<Vec<TreeNode>, String> {
+    let nodes = db::get_all_nodes(pool, dialog_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let all_markers = markers::list_markers_for_dialog(pool, dialog_id).await?;
+    let mut markers_by_node: std::collections::HashMap<String, Vec<markers::Marker>> =
+        std::collections::HashMap::new();
+    for m in all_markers {
+        markers_by_node.entry(m.node_id.clone()).or_default().push(m);
+    }
+
+    Ok(nodes
+        .into_iter()
+        .map(|n| TreeNode {
+            markers: markers_by_node.remove(&n.id).unwrap_or_default(),
+            id: n.id,
+            parent_id: n.parent_id,
+            node_type: n.node_type,
+            content: n.content,
+            active_child_id: n.active_child_id,
+            is_deleted: n.is_deleted,
+            model_id: n.model_id,
+            plugin_id: n.plugin_id,
+            extra: n.extra,
+            created_at: n.created_at,
+        })
+        .collect())
+}
+
+/// Сделать узел активным: провести активный путь от корня до node_id и поставить
+/// на него курсор беседы. Нужно для двойного клика в дереве по узлу ЧУЖОЙ
+/// (неактивной) ветки — после этого узел попадает в ленту и его можно
+/// доскроллить (focusNode).
+///
+/// Шаги: 1) вверх до корня проставляем active_child = ребёнок-на-пути (так путь
+/// корень→node становится активным); 2) вниз от node по существующим active_child
+/// спускаемся к листу; 3) ставим курсор диалога на этот лист (лента = корень→лист
+/// и проходит через node). Удалённый узел не активируем — некуда проваливаться.
+pub async fn activate_path_to(pool: &SqlitePool, node_id: &str) -> Result<(), String> {
+    let target = db::get_node(pool, node_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "node not found".to_string())?;
+
+    if target.is_deleted {
+        return Err("cannot navigate to a deleted node".to_string());
+    }
+
+    let dialog_id = target.dialog_id.clone();
+
+    // 1. Вверх до корня: для каждого узла на пути делаем его активным ребёнком
+    //    родителя. Корень (parent_id = None) завершает подъём.
+    let mut current = target;
+    while let Some(parent_id) = current.parent_id.clone() {
+        db::set_active_child(pool, &parent_id, &current.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        current = db::get_node(pool, &parent_id)
+            .await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "parent node not found".to_string())?;
+    }
+
+    // 2–3. Лист под целевым узлом (по активным детям) и курсор беседы на него.
+    let leaf_id = walk_to_leaf(pool, node_id).await?;
+    db::update_dialog_leaf(pool, &dialog_id, &leaf_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 /// Спуститься по цепочке active_child от start_id до листа.
 async fn walk_to_leaf(pool: &SqlitePool, start_id: &str) -> Result<String, String> {
     let mut current = start_id.to_string();

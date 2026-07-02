@@ -292,6 +292,10 @@ export interface WidgetCapabilities {
     openForm(doc: FormDoc): void;
     refreshForm(doc: FormDoc): void;
     closeForm(): void;
+    /** Визуализатор всего дерева беседы в ЦЕНТРЕ (вместо ленты диалога).
+     *  Плагин присылает лишь ОПЦИИ показа — топологию читает и рисует ХОСТ. */
+    openTree(doc: TreeDoc): void;
+    closeTree(): void;
   };
   // экспорт диалога: «богатый» диапазон (с моделью/плагином/вложениями),
   // чтение картинок в base64 и запись готового документа в выбранный файл.
@@ -322,6 +326,20 @@ export interface HelpDoc {
   title: string;
   paragraphs: string[];
   link?: { label: string; href: string };
+}
+
+// Намерение «показать дерево беседы» (плагин «Дерево»). В отличие от FormDoc,
+// здесь нет состава контролов: топология — структурная данность ядра, её читает
+// и рисует ХОСТ (нативный TreeCanvas), а плагин лишь передаёт СВОИ опции показа.
+// Данные (сериализуемо) → переживает переезд в окно-за-мостом (D-075).
+export interface TreeDoc {
+  widgetId: string;
+  /** Включать ли удалённые ветки (приглушённым цветом). */
+  showDeleted: boolean;
+  /** Показывать ли модель LLM в шапке ZOOM-карточки ответа A. */
+  showModelInZoom: boolean;
+  /** Показывать ли запросы Q, оставшиеся без ответа LLM (с заглушкой-ответом). */
+  showUnanswered: boolean;
 }
 
 /** Превью в центре (тот же хром, что help-doc): один блок текста + действия. */
@@ -506,9 +524,22 @@ export type ViewResult = ControlNode | InactiveResult;
 // update — вся логика; капабилити доступны ТОЛЬКО здесь.
 // ---------------------------------------------------------------------------
 
+// Действие в ШАПКЕ секции виджета (D-070). В отличие от view (тело секции —
+// прячется при сворачивании) шапка видна ВСЕГДА, поэтому headerAction остаётся
+// доступным и у свёрнутого плагина (напр. «Открыть дерево»). Чистая функция
+// фактов, как view: без состояния и капабилити; клик шлёт msg в update.
+export interface WidgetHeaderAction {
+  label: string;
+  msg: WidgetMsg;
+}
+
 export interface WidgetDef<State = unknown, Msg extends WidgetMsg = WidgetMsg> {
   manifest: WidgetManifest;
   initialState(facts: WidgetFacts): State;
   view(state: State, facts: WidgetFacts): ViewResult;
   update(msg: Msg, state: State, cap: WidgetCapabilities): State | Promise<State>;
+  /** Необязательная кнопка в шапке секции (видна и при свёрнутом плагине).
+   *  null — действия нет. Пока плагин отдаёт headerAction, его хост держится
+   *  смонтированным даже свёрнутым, чтобы клик доходил до update. */
+  headerAction?(facts: WidgetFacts): WidgetHeaderAction | null;
 }

@@ -2,6 +2,7 @@
 // Используется плагинами OpenRouter и Gemini (вкладка «Все модели»).
 
 import type { ModalityFlags, ModelCapabilities } from '../host/types';
+import { t } from '../../i18n';
 
 export type { ModalityFlags, ModelCapabilities };
 
@@ -25,13 +26,11 @@ export const MODALITY_KINDS: readonly ModalityKind[] = [
   'other',
 ] as const;
 
-export const MODALITY_LABELS: Record<ModalityKind, string> = {
-  txt: 'Текст',
-  img: 'Изображение',
-  vid: 'Видео',
-  aud: 'Аудио',
-  other: 'Прочее',
-};
+// Подпись категории модальности. Функция (не константа): строка берётся в момент
+// отрисовки, чтобы смена языка подхватывалась перерисовкой без перезапуска.
+export function modalityLabel(kind: ModalityKind): string {
+  return t(`widgets.llm.modality.kind.${kind}`);
+}
 
 /** Состояние фильтра в UI (эфемерное, не в конфиге плагина). */
 export interface ModalityFilterState {
@@ -229,10 +228,10 @@ export function formatCapabilitiesHint(cap: ModelCapabilities): string {
   const inParts: string[] = [];
   const outParts: string[] = [];
   for (const k of MODALITY_KINDS) {
-    if (cap.in[k]) inParts.push(MODALITY_LABELS[k]);
-    if (cap.out[k]) outParts.push(MODALITY_LABELS[k]);
+    if (cap.in[k]) inParts.push(modalityLabel(k));
+    if (cap.out[k]) outParts.push(modalityLabel(k));
   }
   const inStr = inParts.length ? inParts.join(', ') : '—';
   const outStr = outParts.length ? outParts.join(', ') : '—';
-  return `вх: ${inStr} · вых: ${outStr}`;
+  return t('widgets.llm.caps.hint', { in: inStr, out: outStr });
 }

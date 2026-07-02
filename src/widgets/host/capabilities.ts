@@ -21,6 +21,7 @@ import type {
   PreviewDoc,
   PreviewHandlers,
   FormDoc,
+  TreeDoc,
   ExportNode,
   ExportAttachment,
   ExportImage,
@@ -175,6 +176,9 @@ export interface CapabilityDeps {
   onOpenForm: (doc: FormDoc) => void;
   onRefreshForm: (doc: FormDoc) => void;
   onCloseForm: () => void;
+  // плагин «Дерево» просит показать/скрыть визуализатор всего дерева в центре.
+  onOpenTree: (doc: TreeDoc) => void;
+  onCloseTree: () => void;
 }
 
 function notWired(what: string, when: string): never {
@@ -315,6 +319,12 @@ export function makeCapabilities(
       },
       closeForm(): void {
         deps.onCloseForm();
+      },
+      openTree(doc): void {
+        deps.onOpenTree(doc);
+      },
+      closeTree(): void {
+        deps.onCloseTree();
       },
     },
     // -- export: «богатый» диапазон + чтение картинок + запись файла ---------

@@ -6,6 +6,7 @@ import type { LlmResponse } from '../llm/types';
 import { extractFromGeminiParts } from '../llm/extractMedia';
 import { capabilitiesFromGemini } from '../llm/capabilities';
 import { modelAcceptsKind, unsupportedWarning } from '../llm/outgoingMedia';
+import { ct } from './i18n';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -76,22 +77,16 @@ function isUsableModel(m: RawModel): boolean {
 
 function friendlyError(status: number, body: string): string {
   if (status === 429) {
-    return (
-      'Превышен бесплатный лимит Gemini (запросов в минуту/сутки). ' +
-      'Подождите немного и попробуйте снова или выберите другую модель.'
-    );
+    return ct('api.rateLimit');
   }
   if (status === 400 && /API_KEY_INVALID|API key not valid/i.test(body)) {
-    return 'API-ключ Gemini недействителен. Проверьте ключ в настройках.';
+    return ct('api.keyInvalid');
   }
   if (status === 403) {
-    return 'Доступ запрещён (403). Проверьте, что ключ активен и API включён.';
+    return ct('api.forbidden');
   }
   if (status === 503 || status === 500) {
-    return (
-      'Модель Gemini сейчас перегружена на стороне Google (бесплатный тариф). ' +
-      'Это временно — попробуйте через минуту или выберите модель полегче (flash/flash-lite).'
-    );
+    return ct('api.overloaded');
   }
   return `Gemini HTTP ${status}: ${body}`;
 }
@@ -260,18 +255,16 @@ export async function chatCompletion(
   if (!content && media.length === 0) {
     const reason = candidate?.finishReason ?? 'unknown';
     if (reason === 'SAFETY' || reason === 'PROHIBITED_CONTENT') {
-      throw new Error(
-        'Gemini заблокировал ответ по правилам безопасности. Переформулируйте запрос.',
-      );
+      throw new Error(ct('api.safetyBlocked'));
     }
     throw new Error(
-      `Gemini: пустой ответ (finishReason=${reason}, model=${modelId}). Body: ${body.slice(0, 500)}`,
+      ct('api.emptyResponse', { reason, model: modelId, body: body.slice(0, 500) }),
     );
   }
 
   // Ответ только картинкой, без текста — даём заголовок «Ответ:», чтобы плашки
   // не висели в пустом пузыре без подписи.
-  const finalContent = content || 'Ответ:';
+  const finalContent = content || ct('api.answerFallback');
 
   return {
     content: finalContent,
