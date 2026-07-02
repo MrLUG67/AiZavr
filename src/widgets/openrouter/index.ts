@@ -515,7 +515,7 @@ export const openrouter: WidgetDef<State> = {
     if (msg.type === 'FORM_VERIFY_KEY') {
       return (async () => {
         const values =
-          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+          (msg as { values?: Record<string, string> }).values ?? {};
         const apiKeyInput = (values.apiKey ?? '').trim();
         if (!apiKeyInput) {
           const next: State = {
@@ -558,7 +558,7 @@ export const openrouter: WidgetDef<State> = {
     if (msg.type === 'FORM_SAVE_KEY') {
       return (async () => {
         const values =
-          (msg.value as { values?: Record<string, string> } | undefined)?.values ?? {};
+          (msg as { values?: Record<string, string> }).values ?? {};
         const apiKeyInput = (values.apiKey ?? '').trim();
         if (!apiKeyInput) {
           const next: State = {
