@@ -239,6 +239,8 @@
   "widgets.llm.favorites.empty": "No favorite models. Mark the ones you need on the “All models” tab.",
   "widgets.llm.favorites.modelLabel": "Model from favorites",
   "widgets.llm.favorites.modelHint": "Choose the model to process the dialog. “−” removes it from favorites.",
+  "widgets.llm.maxTokens.label": "Max response length (tokens)",
+  "widgets.llm.maxTokens.hint": "Cap on the model's response length (max_tokens). Default {default}. Higher means longer answers and more quota usage.",
   "widgets.llm.allModels.hint": "Check models to add to favorites — they will appear on the first tab.",
   "widgets.llm.allModels.searchPlaceholder": "Filter by name…",
   "widgets.llm.apiKey.current": "Current key: {key}",

@@ -10,6 +10,7 @@ import {
   toDataUrl,
   audioFormat,
 } from '../llm/outgoingMedia';
+import { DEFAULT_MAX_OUTPUT_TOKENS } from '../llm/pluginSettings';
 
 const BASE = 'https://openrouter.ai/api/v1';
 
@@ -17,8 +18,6 @@ const APP_HEADERS = {
   'HTTP-Referer': 'https://github.com/MrLUG67/AiZavr',
   'X-Title': 'AiZavr',
 };
-
-const MAX_OUTPUT_TOKENS = 4096;
 
 export interface OpenRouterModel {
   id: string;
@@ -195,6 +194,7 @@ export async function chatCompletion(
   modelId: string,
   messages: ChatMessage[],
   model?: OpenRouterModel,
+  maxOutputTokens: number = DEFAULT_MAX_OUTPUT_TOKENS,
 ): Promise<LlmResponse> {
   const wantsImage =
     model?.outputModalities?.includes('image') ??
@@ -205,7 +205,7 @@ export async function chatCompletion(
   const bodyPayload: Record<string, unknown> = {
     model: modelId,
     messages: builtMessages,
-    max_tokens: MAX_OUTPUT_TOKENS,
+    max_tokens: maxOutputTokens,
   };
   if (wantsImage) {
     bodyPayload.modalities = ['text', 'image'];

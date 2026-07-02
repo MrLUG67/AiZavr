@@ -28,6 +28,7 @@ import {
   applyRemoveFavorite,
   seedFavoritesIfEmpty,
   modalityFilterUi,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   type LlmPluginConfig,
   type LlmModelRow,
 } from '../llm/pluginSettings';
@@ -47,6 +48,7 @@ interface State {
   hasApiKey: boolean;
   selectedModelId: string;
   favoriteModelIds: string[];
+  maxOutputTokens: number;
   models: GeminiModel[];
   loadingModels: boolean;
   error: string | null;
@@ -95,6 +97,7 @@ const liveState: { current: State } = {
     hasApiKey: false,
     selectedModelId: DEFAULT_MODEL,
     favoriteModelIds: [],
+    maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS,
     models: [],
     loadingModels: false,
     error: null,
@@ -170,7 +173,7 @@ function makeProvider(cap: WidgetCapabilities): LlmProvider {
       const apiKey = await cap.secrets.get(SECRET_PROVIDER_ID);
       if (!apiKey) throw new Error('Gemini API key not set');
       const m = s.models.find((x) => x.id === s.selectedModelId);
-      return chatCompletion(apiKey, s.selectedModelId, messages, m);
+      return chatCompletion(apiKey, s.selectedModelId, messages, m, s.maxOutputTokens);
     },
   };
 }
@@ -262,6 +265,7 @@ async function buildSettingsForm(state: State, cap: WidgetCapabilities): Promise
       maskedKey,
       selectedModelId: state.selectedModelId,
       favoriteModelIds: state.favoriteModelIds,
+      maxOutputTokens: state.maxOutputTokens,
       models: toModelRows(state.models),
       loadingModels: state.loadingModels,
       error: state.error,
@@ -281,6 +285,7 @@ async function openSettingsForm(state: State, cap: WidgetCapabilities): Promise<
     const config: LlmPluginConfig = {
       selectedModelId: state.selectedModelId,
       favoriteModelIds: state.favoriteModelIds,
+      maxOutputTokens: state.maxOutputTokens,
     };
     const next = await adoptModels(loading, models, error, cap, config);
     liveState.current = next;
@@ -400,6 +405,7 @@ export const gemini: WidgetDef<State> = {
           ...state,
           selectedModelId: config.selectedModelId,
           favoriteModelIds: config.favoriteModelIds,
+          maxOutputTokens: config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
           hasApiKey,
           loadingModels: hasApiKey,
         };
@@ -446,6 +452,7 @@ export const gemini: WidgetDef<State> = {
         const config: LlmPluginConfig = {
           selectedModelId: state.selectedModelId,
           favoriteModelIds: state.favoriteModelIds,
+          maxOutputTokens: state.maxOutputTokens,
         };
         next = await adoptModels(next, models, error, cap, config);
         // Снова сетевой сбой — планируем следующую попытку; иначе сбрасываем backoff.
@@ -579,6 +586,7 @@ export const gemini: WidgetDef<State> = {
         const config: LlmPluginConfig = {
           selectedModelId: state.selectedModelId,
           favoriteModelIds: state.favoriteModelIds,
+          maxOutputTokens: state.maxOutputTokens,
         };
         next = await adoptModels(next, models, error, cap, config);
         if (transient) scheduleAutoRetry();
@@ -600,6 +608,7 @@ export const gemini: WidgetDef<State> = {
         const prevConfig: LlmPluginConfig = {
           selectedModelId: state.selectedModelId,
           favoriteModelIds: state.favoriteModelIds,
+          maxOutputTokens: state.maxOutputTokens,
         };
         const config = configFromFormValues(values, prevConfig);
 
@@ -608,6 +617,7 @@ export const gemini: WidgetDef<State> = {
           settingsOpen: false,
           selectedModelId: config.selectedModelId,
           favoriteModelIds: config.favoriteModelIds,
+          maxOutputTokens: config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
           error: null,
           keyVerifyStatus: 'idle',
           keyVerifyMessage: null,

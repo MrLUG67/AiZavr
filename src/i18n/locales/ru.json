@@ -239,6 +239,8 @@
   "widgets.llm.favorites.empty": "Нет избранных моделей. Отметьте нужные на вкладке «Все модели».",
   "widgets.llm.favorites.modelLabel": "Модель из избранных",
   "widgets.llm.favorites.modelHint": "Выберите модель для обработки диалога. «−» убирает из избранного.",
+  "widgets.llm.maxTokens.label": "Макс. длина ответа (токенов)",
+  "widgets.llm.maxTokens.hint": "Потолок длины ответа модели (max_tokens). По умолчанию {default}. Больше — длиннее ответы и выше расход квоты.",
   "widgets.llm.allModels.hint": "Отметьте модели для избранного — они появятся на первой вкладке.",
   "widgets.llm.allModels.searchPlaceholder": "Фильтр по названию…",
   "widgets.llm.apiKey.current": "Текущий ключ: {key}",

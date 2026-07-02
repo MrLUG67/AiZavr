@@ -25,15 +25,40 @@ export function modalityFilterUi(): ModelTableModalityFilterUi {
   };
 }
 
+/**
+ * Потолок длины ответа модели по умолчанию (max_tokens / maxOutputTokens).
+ * Раньше был жёстко зашит в api.ts каждого LLM-плагина; теперь выносится в
+ * настройки, а это значение остаётся дефолтом. Не даём модели резервировать
+ * весь выходной лимит и экономим платную/бесплатную квоту.
+ */
+export const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+/** Границы допустимого значения потолка (защита от опечаток в форме). */
+export const MIN_MAX_OUTPUT_TOKENS = 1;
+export const MAX_MAX_OUTPUT_TOKENS = 1_000_000;
+
 export interface LlmPluginConfig {
   selectedModelId: string;
   favoriteModelIds: string[];
+  /**
+   * Потолок длины ответа модели (max_tokens). Необязателен: если не задан —
+   * используется DEFAULT_MAX_OUTPUT_TOKENS.
+   */
+  maxOutputTokens?: number;
   /**
    * Оценки пользователя 1–5 по id модели (локально, на будущее).
    * Пока не используется в UI; зарезервировано под звёзды на ответах LLM
    * и возможное облачное усреднение.
    */
   modelRatings?: Record<string, number>;
+}
+
+/** Разобрать/валидировать потолок ответа: целое в допустимых границах либо undefined. */
+export function parseMaxOutputTokens(raw: unknown): number | undefined {
+  const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return undefined;
+  const int = Math.floor(n);
+  if (int < MIN_MAX_OUTPUT_TOKENS) return undefined;
+  return Math.min(int, MAX_MAX_OUTPUT_TOKENS);
 }
 
 export interface LlmModelRow {
@@ -50,6 +75,8 @@ export interface LlmSettingsFormState {
   maskedKey: string | null;
   selectedModelId: string;
   favoriteModelIds: string[];
+  /** Текущий потолок длины ответа модели (для поля формы). */
+  maxOutputTokens: number;
   models: LlmModelRow[];
   loadingModels: boolean;
   error: string | null;
@@ -74,6 +101,7 @@ export function parseLlmConfig(raw: string | null, defaultModel: string): LlmPlu
     const o = JSON.parse(raw) as {
       selectedModelId?: unknown;
       favoriteModelIds?: unknown;
+      maxOutputTokens?: unknown;
       modelRatings?: unknown;
     };
     const selectedModelId =
@@ -83,8 +111,14 @@ export function parseLlmConfig(raw: string | null, defaultModel: string): LlmPlu
     const favoriteModelIds = Array.isArray(o.favoriteModelIds)
       ? o.favoriteModelIds.filter((x): x is string => typeof x === 'string')
       : [];
+    const maxOutputTokens = parseMaxOutputTokens(o.maxOutputTokens);
     const modelRatings = parseModelRatings(o.modelRatings);
-    return { selectedModelId, favoriteModelIds, ...(modelRatings ? { modelRatings } : {}) };
+    return {
+      selectedModelId,
+      favoriteModelIds,
+      ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+      ...(modelRatings ? { modelRatings } : {}),
+    };
   } catch {
     return { selectedModelId: defaultModel, favoriteModelIds: [] };
   }
@@ -171,34 +205,47 @@ export function buildLlmSettingsForm(
     ? state.selectedModelId
     : (favoriteModels[0]?.id ?? state.selectedModelId);
 
+  const modelChildren: ControlNode[] =
+    !state.hasApiKey
+      ? [text(lt('favorites.noKeyFirst'), true)]
+      : state.loadingModels
+        ? [text(t('app.settings.loadingModels'), true)]
+        : favoriteModels.length === 0
+          ? [text(lt('favorites.empty'), true)]
+          : [
+              {
+                kind: 'field',
+                label: lt('favorites.modelLabel'),
+                hint: lt('favorites.modelHint'),
+                child: {
+                  kind: 'favoriteModelList',
+                  name: 'modelId',
+                  value: effectiveModelId,
+                  items: favoriteModels.map((m) => ({
+                    id: m.id,
+                    label: m.name,
+                  })),
+                  onRemove: { type: 'FORM_REMOVE_FAVORITE' },
+                },
+              },
+            ];
+
+  // Потолок длины ответа модели — доступен всегда, не зависит от ключа/моделей.
+  const maxTokensField: ControlNode = {
+    kind: 'field',
+    label: lt('maxTokens.label'),
+    hint: lt('maxTokens.hint', { default: DEFAULT_MAX_OUTPUT_TOKENS }),
+    child: {
+      kind: 'textInput',
+      name: 'maxOutputTokens',
+      value: String(state.maxOutputTokens),
+      placeholder: String(DEFAULT_MAX_OUTPUT_TOKENS),
+    },
+  };
+
   const favoritesTab: ControlNode = {
     kind: 'stack',
-    children:
-      !state.hasApiKey
-        ? [text(lt('favorites.noKeyFirst'), true)]
-        : state.loadingModels
-          ? [text(t('app.settings.loadingModels'), true)]
-          : favoriteModels.length === 0
-            ? [
-                text(lt('favorites.empty'), true),
-              ]
-            : [
-                {
-                  kind: 'field',
-                  label: lt('favorites.modelLabel'),
-                  hint: lt('favorites.modelHint'),
-                  child: {
-                    kind: 'favoriteModelList',
-                    name: 'modelId',
-                    value: effectiveModelId,
-                    items: favoriteModels.map((m) => ({
-                      id: m.id,
-                      label: m.name,
-                    })),
-                    onRemove: { type: 'FORM_REMOVE_FAVORITE' },
-                  },
-                },
-              ],
+    children: [...modelChildren, maxTokensField],
   };
 
   const allModelsTab: ControlNode = {
@@ -321,9 +368,12 @@ export function configFromFormValues(
   values: Record<string, string>,
   prev: LlmPluginConfig,
 ): LlmPluginConfig {
+  const maxOutputTokens =
+    parseMaxOutputTokens(values.maxOutputTokens) ?? prev.maxOutputTokens;
   return {
     selectedModelId: values.modelId || prev.selectedModelId,
     favoriteModelIds: parseFavoritesFromValues(values.favoriteModelIds, prev.favoriteModelIds),
+    ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
     ...(prev.modelRatings ? { modelRatings: prev.modelRatings } : {}),
   };
 }

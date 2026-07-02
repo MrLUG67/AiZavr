@@ -6,14 +6,10 @@ import type { LlmResponse } from '../llm/types';
 import { extractFromGeminiParts } from '../llm/extractMedia';
 import { capabilitiesFromGemini } from '../llm/capabilities';
 import { modelAcceptsKind, unsupportedWarning } from '../llm/outgoingMedia';
+import { DEFAULT_MAX_OUTPUT_TOKENS } from '../llm/pluginSettings';
 import { ct } from './i18n';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-// Потолок длины ответа (как у OpenRouter-плагина): не даём модели резервировать
-// весь outputTokenLimit, экономим бесплатную квоту. Достаточно для развёрнутого
-// ответа; при нужде поднимается.
-const MAX_OUTPUT_TOKENS = 4096;
 
 export interface GeminiModel {
   id: string; // без префикса "models/", напр. "gemini-2.5-flash"
@@ -194,6 +190,7 @@ export async function chatCompletion(
   modelId: string,
   messages: ChatMessage[],
   model?: GeminiModel,
+  maxOutputTokens: number = DEFAULT_MAX_OUTPUT_TOKENS,
 ): Promise<LlmResponse> {
   const { systemInstruction, contents, warnings } = toGeminiContents(
     messages,
@@ -202,7 +199,7 @@ export async function chatCompletion(
   const wantsImage = /image/i.test(modelId);
 
   const generationConfig: Record<string, unknown> = {
-    maxOutputTokens: MAX_OUTPUT_TOKENS,
+    maxOutputTokens,
   };
   if (wantsImage) {
     generationConfig.responseModalities = ['TEXT', 'IMAGE'];
